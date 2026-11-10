@@ -1,0 +1,56 @@
+DigiTool – instalace jako APK (obchod Chromu „Nainstalovat aplikaci“ nestačí)
+========================================================================
+
+Proč v Chromu často nevidíte „Nainstalovat aplikaci“
+----------------------------------------------------
+• Adresa musí být z „bezpečného kontextu“ (HTTPS nebo localhost / 127.0.0.1).
+• Musí fungovat manifest, ikony a service worker – viz pwa-instalace.txt.
+
+Pokud to na tabletu stejně nechcete řešit přes Chrom, můžete si **vybuildit APK**
+(soubor aplikace pro Android) a ten do tabletu nahrát ručně (např. přes USB,
+Disk Google, e‑mail – podle nastavení zařízení).
+
+
+Postup: Capacitor + Android Studio (doporučeno pro plně offline balík)
+-----------------------------------------------------------------------
+Potřebujete na PC: **Node.js (LTS)**, **Android Studio** (SDK, případně JDK).
+
+1) Otevřete terminál ve složce projektu:
+   …\DigiTool\DigiToolTabletAndroid
+
+2) Nainstalujte závislosti:
+   npm install
+
+3) Zkopírujte web do www a synchronizujte s Android projektem:
+   npm run copy:www
+   npx cap add android
+   (při prvním spuštění vytvoří složku android/)
+
+   npm run sync
+
+4) Otevřete projekt v Android Studiu:
+   npm run open:android
+   nebo: npx cap open android
+
+5) V Android Studiu: **Build → Build Bundle(s) / APK(s) → Build APK(s)**  
+   Hotový APK najdete v android/app/build/outputs/…
+
+6) APK přeneste na tablet a povolte instalaci z neznámých zdrojů (dle zařízení).
+
+Po každé změně souborů ve složce „DigiTool pro Tablet“ znovu:
+   npm run copy:www
+   npm run sync
+a v Android Studiu znovu sestavte APK.
+
+
+Alternativa bez Android Studia (vyžaduje HTTPS výstup na webu)
+--------------------------------------------------------------
+• https://www.pwabuilder.com – lze zabalit PWA do APK, ale typicky potřebujete
+  veřejnou HTTPS adresu, kde DigiTool běží.
+
+
+Technická poznámka
+------------------
+Složka DigiToolTabletAndroid/kopíruje obsah „DigiTool pro Tablet“ do www/,
+aby do APK šly i soubory vendor/ a ikony. Nepřejmenovávejte složku
+„DigiTool pro Tablet“, nebo upravte cestu v scripts/copy-www.mjs.

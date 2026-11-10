@@ -1,0 +1,165 @@
+DigiTool – jak to dát na internet (GitHub) a ukládat data na Google Disk
+=========================================================================
+
+Tento návod je psaný úplně od začátku. Stačí dělat kroky jeden po druhém.
+Nemusíte rozumět programování – jen kopírovat, vkládat a klikat tam, kde je napsáno.
+
+
+CO SE STANE PO ÚPRAVÁCH
+-----------------------
+• DigiTool poběží v prohlížeči z adresy typu: https://vase-jmeno.github.io/nazev-projektu/
+• Když se žák vrátí do rozcestníku po každé dokončené úloze, počítač/tablet už nestáhne soubor .json.
+• Místo toho se soubor daného respondenta pošle na Google Disk a při další úloze se aktualizuje (ID složky už je v kódu).
+
+
+ČÁST A – GOOGLE DISK (malý „most“ přes Google Apps Script)
+----------------------------------------------------------
+
+Proč: Webová stránka na GitHubu sama od sebe na váš Disk zapisovat nemůže.
+Nejjednodušší je malý skript ve vašem Google účtu – ten soubor přijme a uloží.
+
+KROK A1 – Otevřete editor skriptů
+   1. V prohlížeči jděte na: https://script.google.com
+   2. Přihlaste se stejným Google účtem, pod kterým máte tu složku na Disku.
+   3. Klikněte na „Nový projekt“ (nebo „New project“).
+
+KROK A2 – Vložte kód
+   1. V levém panelu smažte vše, co je v souboru Code.gs (prázdný soubor nevadí).
+   2. Otevřete ve složce DigiTool soubor: google-drive-upload.gs
+   3. Označte VŠECHNO (Ctrl+A), zkopírujte (Ctrl+C).
+   4. Vložte do editoru na script.google.com (Ctrl+V).
+   5. Nahoře klikněte na ikonu diskety nebo Ctrl+S – uložit.
+   6. Projekt si můžete přejmenovat nahoře na „DigiTool upload“.
+
+KROK A3 – První spuštění (povolení přístupu k Disku)
+   1. Nahoře v menu vyberte funkci: doGet (v rozbalovacím seznamu funkcí).
+   2. Klikněte „Spustit“ / „Run“ (▶).
+   3. Google vás požádá o oprávnění – „Zkontrolovat oprávnění“ → vyberte svůj účet.
+   4. Může se objevit „Tato aplikace není ověřena“ – klikněte „Pokročilé“ →
+      „Přejít na DigiTool upload (nebezpečné)“ (je to váš vlastní skript).
+   5. Povolte přístup (Drive, soubory atd.).
+   6. V dolním panelu by mělo být něco jako „DigiTool – odesílání na Google Disk běží.“
+
+KROK A4 – Nasadit jako webovou adresu (URL)
+   1. Vpravo nahoře: „Nasadit“ / „Deploy“ → „Nové nasazení“ / „New deployment“.
+   2. Vedle „Vybrat typ“ klikněte na ozubené kolečko → „Webová aplikace“.
+   3. Nastavení:
+        • Popis: klidně „DigiTool“
+        • Spouštět jako: Já (váš e-mail)
+        • Kdo má přístup: Kdokoli / Anyone
+   4. Klikněte „Nasadit“ / „Deploy“.
+   5. Znovu potvrďte oprávnění, pokud se zeptá.
+   6. Zkopírujte si „URL webové aplikace“ – vypadá zhruba takto:
+        https://script.google.com/macros/s/AKfycb.............../exec
+      Tuto adresu si nechte v Poznámkovém bloku – budete ji vkládat do index.html.
+
+KROK A5 – Složka na Disku
+   • ID složky 1uT1p5MxF1VSp8EvEGmoFOqgaTSH1IiPv je už v souboru google-drive-upload.gs.
+   • Skript musí běžet pod účtem, který má do té složky právo zapisovat (vlastník nebo sdílení).
+
+
+ČÁST B – UPRAVIT DIGITOOL (vložit adresu skriptu)
+------------------------------------------------
+
+KROK B1
+   1. Otevřete soubor index.html ve složce „DigiTool pro Tablet 1.1“
+      (klidně Poznámkový blok nebo Cursor).
+   2. Najděte řádek (Ctrl+F):
+        GOOGLE_DRIVE_UPLOAD_URL
+   3. Místo prázdných uvozovek '' vložte vaši URL z kroku A4, například:
+        const GOOGLE_DRIVE_UPLOAD_URL = 'https://script.google.com/macros/s/AKfycb.../exec';
+   4. Uložte soubor (Ctrl+S).
+
+KROK B2 – Rychlý test jen uploadu (volitelné)
+   1. Nahrajte index.html na GitHub až v části C, nebo otevřete lokálně přes Pages.
+   2. Po návratu z první dokončené úlohy zkontrolujte složku na Disku – měl by tam přibýt soubor
+      DigiTool_260517_01.json (číslo se liší). Po další úloze se stejný soubor aktualizuje.
+
+
+ČÁST C – NAHRÁT PROJEKT NA GITHUB
+---------------------------------
+
+KROK C1 – Účet a nový repozitář
+   1. Jděte na https://github.com a přihlaste se (nebo si účet založte).
+   2. Vpravo nahoře „+“ → „New repository“.
+   3. Repository name: např. digitool-tablet
+   4. Public
+   5. NEZAŠKRTÁVEJTE „Add a README“ (chcete prázdný repozitář).
+   6. „Create repository“.
+
+KROK C2 – Nahrát soubory přes web (nejjednodušší, bez příkazové řádky)
+   1. Na stránce nového repozitáře: „uploading an existing file“ nebo
+      „Add file“ → „Upload files“.
+   2. Otevřete Průzkumník a složku:
+      DigiTool pro Tablet 1.1
+   3. Označte a přetáhněte VŠECHNO uvnitř složky, včetně:
+        index.html, *.html, manifest.webmanifest, sw.js, icon.svg,
+        složka vendor, složka scripts, google-drive-upload.gs,
+        github-a-google-disk-navod.txt
+      (soubory .txt s návody můžete nechat – neuškodí).
+   4. Dole „Commit changes“ → zelené tlačítko.
+
+KROK C3 – Zapnout GitHub Pages (aby to šlo spustit online)
+   1. V repozitáři: záložka „Settings“.
+   2. Vlevo menu „Pages“.
+   3. U „Build and deployment“ → Source: „Deploy from a branch“.
+   4. Branch: main (nebo master), folder: / (root).
+   5. Save.
+   6. Po 1–3 minutách se nahoře objeví zelená adresa, např.:
+        https://VASE-GITHUB-JMENO.github.io/digitool-tablet/
+   7. Tu adresu otevřete na tabletu v Chromu – začíná rozcestníkem index.html.
+
+Poznámka k ikonám PWA: manifest odkazuje na icon-192.png. Pokud chybí, spusťte na PC
+ve složce scripts soubor gen-pwa-icons.ps1 (pravým → Spustit v PowerShellu), pak
+znovu nahrajte vygenerované png na GitHub.
+
+
+ČÁST D – JAK TO OVĚŘIT, ŽE TO FUNGUJE
+-----------------------------------
+
+1. Otevřete Pages adresu v Chromu (ne jako soubor z disku – musí být https://…).
+2. Projdete úvod (duch), vyberete třídu a pohlaví.
+3. Dokončíte jednu úlohu a vrátíte se do rozcestníku. Na Google Disku ve složce s daným ID přibude JSON soubor respondenta.
+4. Po druhé a třetí úloze se stejný soubor na Disku aktualizuje. Poděkování „Děkujeme!“ se zobrazí až po třetí úloze.
+5. Na tabletu by se nemělo stahovat nic do „Stažených souborů“.
+
+Když soubor na Disku není:
+   • Zkontrolujte, že v index.html je správná GOOGLE_DRIVE_UPLOAD_URL (končí /exec).
+   • V Apps Script znovu Deploy → „Nové nasazení“ po změně kódu skriptu.
+   • Účet ve skriptu musí mít přístup ke složce na Disku.
+   • Otevřete v Chromu na PC F12 → záložka Console – hledejte chybu při odeslání.
+
+Když se soubor STÁHNE do počítače místo na Disk:
+   • Nejčastější příčina: na GitHubu ještě běží STARÁ verze (ta uměla jen stahovat).
+   • Na GitHubu znovu nahrajte/upravte: index.html, sw.js, 19_EulerTask_plus3.html,
+     14_DegreeSequenceTask.html a google-drive-upload.gs (a v Apps Script znovu Deploy).
+   • V Chromu otevřete Pages adresu → Ctrl+Shift+R (tvrdé obnovení) nebo
+     ⋮ → Smazat data prohlížeče → mezipaměť pro tuto stránku.
+   • Název staženého souboru:
+        DigiTool_… .json  = po všech 3 úlohách (hub) – stará verze index.html
+        DigiTool_euler… / degree… = záloha z jedné úlohy – aktualizujte i tyto html soubory
+
+
+ČÁST E – KDYŽ ZMĚNÍTE KÓD POZDĚJI
+---------------------------------
+
+• Změníte index.html → na GitHubu „Upload files“ nebo upravte soubor v prohlížeči,
+  commit.
+• Změníte google-drive-upload.gs → upravte na script.google.com → znovu Deploy
+  → New deployment (stará URL někdy pořád funguje, ale po větší změně raději nová).
+
+
+BEZPEČNOST (jen pro vaši informaci)
+----------------------------------
+Tento postup je záměrně jednoduchý: kdokoli, kdo zná adresu skriptu, může posílat
+soubory do vaší složky. Pro školní sběr dat v uzavřené studii to často stačí.
+Pro veřejný internet by bylo lepší heslo nebo ověření – to zde záměrně není.
+
+
+SHRNUTÍ V 5 VĚTÁCH
+------------------
+1. Vložíte google-drive-upload.gs do script.google.com a nasadíte jako Web app.
+2. Zkopírujete URL /exec do index.html do GOOGLE_DRIVE_UPLOAD_URL.
+3. Celou složku nahrajete na GitHub.
+4. V Settings → Pages zapnete hosting z větve main.
+5. Žáci otevřou Pages odkaz; data skončí na vašem Disku, ne v počítači.

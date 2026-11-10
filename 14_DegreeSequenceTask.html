@@ -1,0 +1,2975 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#1f2a44" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <title>DigiTool</title>
+  
+  <script src="vendor/jspsych/jspsych.browser.min.js"></script>
+  <script src="vendor/plugin-html-button-response/plugin-html-button-response.browser.min.js"></script>
+  <script src="digitool-action-log-store.js"></script>
+  <script src="digitool-idle-prompt.js"></script>
+  <link href="vendor/jspsych/jspsych.css" rel="stylesheet" />
+  
+  <style>
+    body { height: 100%; margin: 0; background-color: #f4f4f9; }
+    .wrap { max-width: 840px; margin: 24px auto; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .prompt { margin-bottom: 20px; font-size: 18px; line-height: 1.5; text-align: center; }
+    /* Společné styly pro kontejnery */
+    .svg-container { width: 100%; height: 420px; background: #fff; border: 1px solid #ddd; border-radius: 8px; touch-action: none; }
+    .ui { text-align: center; margin-top: 15px; }
+    .note { color: #555; font-size: 14px; }
+
+    /* ==========================================
+       Styly pro úlohu 1 (Mapa - DegreeSequence)
+       ========================================== */
+    #degree-graph { background-color: #e6f2eb; } /* green background */
+
+    /* Oranžové nápovědy: zalamování na výšku, ne rozšiřování layoutu do šířky */
+    .task-hint-banner {
+      box-sizing: border-box;
+      max-width: 100%;
+      overflow-wrap: break-word;
+      word-wrap: break-word;
+      word-break: break-word;
+      hyphens: auto;
+    }
+    /* Zelené SVG plátno — jednotná velikost (viewBox 480×360), nezávislá na nápovědě */
+    .degree-plot-column {
+      width: 480px;
+      max-width: min(480px, 100%);
+      flex: 0 1 auto;
+      min-width: 0;
+    }
+    .degree-plot-column--centered {
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .degree-plot-column .svg-container {
+      width: 100%;
+      max-width: 480px;
+      height: 420px;
+      display: block;
+      box-sizing: border-box;
+    }
+    
+    .numpad-btn { font-size: 24px; font-weight: bold; border: 2px solid #ccc; border-radius: 8px; background: #fff; cursor: grab; transition: 0.2s; user-select: none; -webkit-user-select: none; }
+    .numpad-btn:hover { background: #f0f0f0; border-color: #888; }
+    .numpad-btn:active { cursor: grabbing; }
+    .numpad-btn.selected { background: #b3e0ff; border-color: #007bff; box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25); }
+    
+    .deg-node { cursor: pointer; }
+    .deg-node.drag-over .town-highlight { fill: #ffe0b2; stroke: #ff9800; }
+    
+    /* Podklad pro barevné zvýraznění městečka */
+    .town-highlight { fill: transparent; stroke: transparent; stroke-width: 3px; transition: 0.2s; }
+    .deg-node:hover .town-highlight { fill: rgba(255, 255, 255, 0.5); }
+    .deg-node.selected .town-highlight { fill: #b3e0ff; stroke: #007bff; }
+    .deg-node.correct .town-highlight { fill: #d4edda; stroke: #28a745; }
+    .deg-node.incorrect .town-highlight { fill: #f8d7da; stroke: #dc3545; }
+    
+    .town-icon { font-size: 32px; text-anchor: middle; dominant-baseline: central; pointer-events: none; user-select: none; }
+    #degree-graph .road.degree1-incident .degree1-asphalt {
+      stroke: #0d3b66;
+      stroke-width: 22px;
+    }
+    .ghost-bubble.degree1-hint-menu-wide {
+      max-width: min(480px, 94vw);
+    }
+    .ghost-bubble.degree1-hint-menu-wide .ghost-hint-btn {
+      display: block;
+      width: 100%;
+      white-space: normal;
+      line-height: 1.35;
+    }
+    
+    /* Odznáček pro zapsané číslo */
+    .badge-bg { fill: #ffffff; stroke: #333; stroke-width: 2px; }
+    .badge-text { pointer-events: none; font-family: sans-serif; font-weight: bold; font-size: 14px; text-anchor: middle; dominant-baseline: central; user-select: none; }
+
+
+    /* ==========================================
+       Styly pro úlohu 2 (Klasický graf - Connect)
+       ========================================== */
+    #connect-graph, #connect-graph-3 { background-color: #e6f2eb; } /* stejné jako DegreeSequence */
+    .node { cursor: grab; }
+    .node:active { cursor: grabbing; }
+    .node .town-highlight { fill: transparent; stroke: transparent; stroke-width: 3px; transition: 0.2s; }
+    .node:hover .town-highlight { fill: rgba(255, 255, 255, 0.5); }
+    .node.selected .town-highlight { fill: #b3e0ff; stroke: #007bff; }
+    .node.correct .town-highlight { fill: #d4edda; stroke: #28a745; }
+    .node.incorrect .town-highlight { fill: #f8d7da; stroke: #dc3545; }
+    .node .town-icon { font-size: 32px; text-anchor: middle; dominant-baseline: central; pointer-events: none; user-select: none; }
+    @keyframes degree-connect-pulse {
+      0%, 100% { stroke-width: 3px; fill: rgba(255, 140, 0, 0.25); }
+      50% { stroke-width: 8px; fill: rgba(255, 140, 0, 0.6); }
+    }
+    .node.degree-connect-pulse .town-highlight {
+      stroke: #e67e22;
+      animation: degree-connect-pulse 1s ease-in-out infinite;
+    }
+    .node.degree-connect-pulse .town-icon {
+      filter: drop-shadow(0 0 3px #e67e22);
+    }
+    #connect-container.degree-count-mode,
+    #connect-container.degree-count-mode * {
+      cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M4 28 L20 10' stroke='%236d28d9' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M18 6 L26 10 L20 14 Z' fill='%23f5c518' stroke='%235b21b6' stroke-width='1'/%3E%3C/svg%3E") 20 10, crosshair;
+    }
+    #connect-container.degree-count-mode #ghost-ui,
+    #connect-container.degree-count-mode #ghost-ui *,
+    #connect-container.degree-count-mode .custom-task-btn,
+    #connect-container.degree-count-mode .degree-connect-degree-tip {
+      cursor: pointer;
+    }
+    .degree-connect-degree-tip {
+      position: fixed;
+      z-index: 1200;
+      pointer-events: none;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+      height: 32px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #ff8c00;
+      color: #fff;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      font-weight: 800;
+      font-size: 16px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    }
+
+    .node text { user-select: none; pointer-events: none; font-family: sans-serif; font-weight: bold; font-size: 14px; text-anchor: middle; dominant-baseline: central; }
+    .edge { stroke: none; }
+    .ghost-bubble {
+      margin-left: -10px;
+      margin-bottom: 40px;
+      position: relative;
+      background: #fff;
+      border: 3px solid #007bff;
+      border-radius: 20px;
+      padding: 20px;
+      min-width: 280px;
+      max-width: 320px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      opacity: 0;
+      pointer-events: none;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .ghost-bubble.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    /* Blokové flex #ghost-ui jinak sahá přes celou šířku a s vysokým z-indexem pohltí kliky na tlačítka úlohy pod ním */
+    #ghost-ui {
+      width: max-content;
+      max-width: 100%;
+      box-sizing: border-box;
+      pointer-events: none;
+    }
+    #ghost-ui #ghost-character {
+      pointer-events: auto;
+    }
+    .ghost-text {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1f2a44;
+      margin-bottom: 15px;
+      text-align: center;
+      line-height: 1.3;
+    }
+    .ghost-buttons > button,
+    .ghost-hint-btn {
+      margin-top: 4px;
+      padding: 10px 15px;
+      font-size: 14px;
+      border-radius: 8px;
+      border: none;
+      background: #007bff;
+      color: #ffffff;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      text-align: center;
+    }
+    .ghost-buttons > button:hover,
+    .ghost-hint-btn:hover {
+      background: #0056d2;
+    }
+    /* Dialog „Myslíš si…“: skrýt šedá tlačítka, zablokovat úlohu; duch (ghost-hint-btn) zůstane */
+    body.digitool-self-assessment-lock #jspsych-target button.custom-task-btn {
+      display: none !important;
+    }
+    body.digitool-self-assessment-lock #jspsych-target #degree-container.digitool-task-surface,
+    body.digitool-self-assessment-lock #jspsych-target #connect-container > #ghost-ui ~ *,
+    body.digitool-self-assessment-lock #jspsych-target .digitool-task-surface,
+    body.digitool-self-assessment-lock #jspsych-target .park-task-root #park-container.digitool-task-surface,
+    body.digitool-self-assessment-lock #jspsych-target .park-task-root > .prompt,
+    body.digitool-self-assessment-lock #jspsych-target .park-task-root .park-zoom.digitool-task-surface {
+      pointer-events: none !important;
+      user-select: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="jspsych-target" class="wrap"></div>
+
+  <script>
+    const DIGITOOL_RESULTS_KEY = 'digitool_results';
+    const DIGITOOL_HUB_FILE = 'index.html';
+    const setDigitoolSelfAssessmentUiLock = (locked) => {
+      document.body.classList.toggle("digitool-self-assessment-lock", !!locked);
+    };
+
+    /** Jednoduchý graf s danými stupni (Havel–Hakimi). Vstupem jsou uzly s polem label. */
+    const realizeSimpleGraphFromDegreeLabels = (nodeList) => {
+      const remaining = nodeList.map((n) => ({
+        id: n.id,
+        deg: parseInt(n.label, 10)
+      }));
+      if (remaining.some((n) => Number.isNaN(n.deg) || n.deg < 0)) return null;
+      const edgesOut = [];
+      const guard = remaining.length * remaining.length + 5;
+      for (let step = 0; step < guard; step += 1) {
+        remaining.sort((a, b) => b.deg - a.deg || a.id - b.id);
+        if (remaining.every((n) => n.deg === 0)) return edgesOut;
+        const head = remaining[0];
+        if (head.deg <= 0 || head.deg >= remaining.length) return null;
+        const targets = remaining.slice(1, 1 + head.deg);
+        if (targets.length < head.deg || targets.some((n) => n.deg <= 0)) return null;
+        targets.forEach((n) => {
+          n.deg -= 1;
+          edgesOut.push({ u: head.id, v: n.id });
+        });
+        head.deg = 0;
+      }
+      return null;
+    };
+
+    const showHintBanner = (idOrEl) => {
+      const el = typeof idOrEl === 'string' ? document.getElementById(idOrEl) : idOrEl;
+      if (!el) return;
+      el.style.display = 'block';
+      requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    };
+    const attachWindowScrollLogger = (logFn, scope) => {
+      let ticking = false;
+      const onScroll = () => {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(() => {
+          logFn('window_scroll', {
+            scope,
+            scroll_x: Math.round(window.scrollX || 0),
+            scroll_y: Math.round(window.scrollY || 0)
+          });
+          ticking = false;
+        });
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      return () => window.removeEventListener('scroll', onScroll);
+    };
+    const urlParams = new URLSearchParams(window.location.search);
+    const respondentIdFromUrl = urlParams.get('rid');
+    const DIGITOOL_LOG_SCOPE = 'degree';
+    DigitoolActionLogStore.watchProgress(respondentIdFromUrl, DIGITOOL_LOG_SCOPE);
+    history.pushState(null, '', location.href);
+    window.addEventListener('popstate', () => {
+      history.pushState(null, '', location.href);
+    });
+
+    const buildActionLogDescription = (action, detail) => {
+      if (detail.node != null && detail.new_x != null && detail.new_y != null) {
+        return `${action}: node ${detail.node} -> (${detail.new_x}, ${detail.new_y})`;
+      }
+      if (detail.from != null && detail.to != null) {
+        return `${action}: ${detail.from}-${detail.to}`;
+      }
+      if (detail.node != null) return `${action}: node ${detail.node}`;
+      return action;
+    };
+
+    const normalizeActionLogEntryForExport = (entry) => {
+      if (!entry || typeof entry !== 'object') return entry;
+      const action = entry.action || entry.type || 'unknown_action';
+      const time =
+        entry.time ??
+        (entry.ts_iso ? Date.parse(entry.ts_iso) : null) ??
+        Date.now();
+      const detail = { ...entry };
+      delete detail.action;
+      delete detail.type;
+      delete detail.time;
+      delete detail.t_ms;
+      delete detail.ts_iso;
+      delete detail.description;
+      const hasDetail = Object.keys(detail).length > 0;
+      return {
+        time,
+        action,
+        description: hasDetail ? buildActionLogDescription(action, detail) : action,
+        ...detail
+      };
+    };
+
+    const collectTrialActionLogsForExport = (trial) => {
+      if (!trial || typeof trial !== 'object') return [];
+      if (Array.isArray(trial.action_logs) && trial.action_logs.length > 0) {
+        return trial.action_logs;
+      }
+      if (Array.isArray(trial.interaction_log) && trial.interaction_log.length > 0) {
+        return trial.interaction_log;
+      }
+      return Array.isArray(trial.action_logs) ? trial.action_logs : [];
+    };
+
+    const sanitizeDigitoolJsPsychTrialsForExport = (trials) =>
+      trials.map((t) => {
+        if (!t || typeof t !== 'object') return t;
+        const out = { ...t };
+        if ('stimulus' in out) out.stimulus = '';
+        if (out.action_logs || out.interaction_log) {
+          out.action_logs = collectTrialActionLogsForExport(out).map(
+            normalizeActionLogEntryForExport
+          );
+          delete out.interaction_log;
+        }
+        if ('final_nodes_positions' in out) delete out.final_nodes_positions;
+        if ('final_edges' in out) delete out.final_edges;
+        return out;
+      });
+
+    const saveDegreeToHub = () => {
+      try {
+        const storedLogs = DigitoolActionLogStore.read(respondentIdFromUrl, 'degree');
+        let allData = sanitizeDigitoolJsPsychTrialsForExport(jsPsych.data.get().values());
+        allData = DigitoolActionLogStore.mergeTrialsWithStoredLogs(allData, storedLogs);
+        const parsed = JSON.parse(localStorage.getItem(DIGITOOL_RESULTS_KEY) || '{}');
+        parsed.degree = {
+          respondent_id: respondentIdFromUrl || null,
+          completed_at: new Date().toISOString(),
+          action_logs: storedLogs.map(normalizeActionLogEntryForExport),
+          trials: allData
+        };
+        localStorage.setItem(DIGITOOL_RESULTS_KEY, JSON.stringify(parsed));
+        window.location.href = `${DIGITOOL_HUB_FILE}?completed=degree`;
+        return true;
+      } catch (err) {
+        console.error('Nepodařilo se uložit Degree data do hubu:', err);
+        return false;
+      }
+    };
+
+    const jsPsych = initJsPsych({
+    display_element: 'jspsych-target',
+    on_finish: function() {
+        if (!saveDegreeToHub()) {
+          alert('Tulosten tallennus epäonnistui. Yritä suorittaa tehtävä uudelleen tai ota yhteyttä tutkimuksen ohjaajaan.');
+        }
+    }
+});
+
+
+ // ==========================================
+    // ÚLOHA 1: Mapa s hrady a chytrou nápovědou
+    // ==========================================
+    const DegreeSequence1 = {
+      type: jsPsychHtmlButtonResponse,
+      choices: [],
+      data: { task_name: 'DegreeSequence1' },
+      stimulus: () => {
+        return `
+          <div id="ghost-ui" style="position: fixed; bottom: 20px; left: 20px; display: flex; align-items: flex-end; z-index: 999; transition: transform 0.5s ease; transform: scale(1); transform-origin: bottom left;">            
+            <div id="ghost-character" style="text-align: center; animation: float 3s ease-in-out infinite; cursor: pointer;">
+              <div style="font-size: 100px; line-height: 1;">👻</div>
+              <div style="font-weight: bold; background: rgba(255,255,255,0.8); padding: 2px 8px; border-radius: 10px;"></div>
+            </div>
+
+            <div id="ghost-bubble" class="ghost-bubble">
+              <div id="ghost-text" class="ghost-text">
+                Oletko joskus ratkaissut samankaltaisen tehtävän?
+              </div>
+              <div id="ghost-buttons" style="display: flex; gap: 10px; justify-content: center; flex-direction: row;">
+                <button id="ghost-btn-yes" style="padding: 10px 15px; border: none; border-radius: 8px; background: #28a745; color: white; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s;">Kyllä</button>
+                <button id="ghost-btn-unknown" style="padding: 10px 15px; border: none; border-radius: 8px; background: #007bff; color: white; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s;">En tiedä</button>
+                <button id="ghost-btn-no" style="padding: 10px 15px; border: none; border-radius: 8px; background: #dc3545; color: white; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s;">Ei</button>
+              </div>
+              <div style="position: absolute; bottom: -15px; left: 30px; width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 15px solid #007bff;"></div>
+              <div style="position: absolute; bottom: -10px; left: 30px; width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 15px solid #fff;"></div>
+            </div>
+          </div>
+
+          <div id="degree-container" class="digitool-task-surface" style="position: relative;">
+            <div id="ghost-blocker" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 998; cursor: pointer;"></div>
+            <div class="prompt" style="position: relative;">
+              <h2>Kuinka monta tietä lähtee jokaisesta linnasta?</h2>
+              <p>Napsauta ensin linnaa ja sitten numeroa numerotaulussa, tai vedä numero linnaan.</p>
+              
+              <div id="hint-must-answer" class="task-hint-banner" style="display: none; background: #ffe8cc; color: #8a4b08; border: 2px solid #ff8c00; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                Vastaa ensin aaveen kysymyksiin.
+              </div>
+
+              <div id="hint-box-2" class="task-hint-banner" style="display: none; background: #ffe8cc; color: #8a4b08; border: 2px solid #ff8c00; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                Kun merkitset linnan numerolla, näytän, onko numero oikein. Vihreät linnat ovat oikein, punaiset linnat pitää korjata.
+              </div>
+              
+              <div id="hint-box-3" class="task-hint-banner" style="display: none; background: #ffe8cc; color: #8a4b08; border: 2px solid #ff8c00; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                Napsauta ensin linnaa, jonka numeron haluat poistaa, ja sitten painiketta Poista numero.
+              </div>
+
+              <div id="degree1-orange-hint" class="task-hint-banner" style="display: none; background: #ffe8cc; color: #8a4b08; border: 2px solid #ff8c00; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);"></div>
+            </div>
+            
+            <div style="display: flex; gap: 20px; align-items: flex-start; justify-content: center;">
+              <div class="degree-plot-column">
+                <svg id="degree-graph" class="svg-container" viewBox="0 0 480 360" preserveAspectRatio="xMidYMid meet" style="background-color: #e6f2eb;"></svg>
+              </div>
+              <div id="numpad" style="display: grid; grid-template-columns: repeat(2, 60px); grid-template-rows: repeat(5, 60px); gap: 10px; align-content: center; flex-shrink: 0;">
+                </div>
+            </div>
+          </div>
+
+	<div style="display: flex; justify-content: center; gap: 10px; margin-top: 20px;">
+            <button id="btn-hide-hint" class="custom-task-btn" style="padding: 10px 15px; border: 2px solid #333; border-radius: 8px; background: #333; color: white; cursor: pointer; font-weight: bold; margin: 5px;">Piilota vihje</button>
+            <button id="btn-delete" class="custom-task-btn" style="padding: 10px 15px; border: 2px solid #333; border-radius: 8px; background: #333; color: white; cursor: pointer; font-weight: bold; margin: 5px;">Poista numero</button>
+            <button id="btn-restart" class="custom-task-btn" style="padding: 10px 15px; border: 2px solid #333; border-radius: 8px; background: #333; color: white; cursor: pointer; font-weight: bold; margin: 5px;">Aloita alusta</button>
+            <button id="btn-next" class="custom-task-btn" style="padding: 10px 15px; border: 2px solid #333; border-radius: 8px; background: #333; color: white; cursor: pointer; font-weight: bold; margin: 5px;">Seuraava tehtävä</button>
+          </div>
+
+          <style>
+            @keyframes float {
+              0%, 100% { transform: translateY(0); }
+              50% { transform: translateY(-15px); }
+            }
+            .ghost-hint-btn {
+                margin-top: 4px;
+                padding: 10px 15px;
+                font-size: 14px;
+                border-radius: 8px;
+                border: none;
+                background: #007bff;
+                color: #ffffff;
+                cursor: pointer;
+                font-weight: bold;
+                transition: background 0.2s ease;
+                width: 100%;
+                text-align: center;
+                margin-bottom: 5px;
+            }
+            .ghost-hint-btn:hover {
+                background: #0056d2;
+            }
+            .custom-task-btn:hover {
+                background: #555 !important;
+            }
+            .degree-self-assessment-wide {
+              max-width: min(400px, 94vw);
+            }
+          </style>
+        `;
+      },
+      on_load: () => {
+        setDigitoolSelfAssessmentUiLock(false);
+        disposeDigitoolIdleTimer();
+        console.log('DegreeSequence1: on_load started.');
+        const svg = document.getElementById('degree-graph');
+        const numpad = document.getElementById('numpad');
+        const svgNS = "http://www.w3.org/2000/svg";
+        
+        let selectedNodeId = null;
+        let selectedValue = null;
+        let actionLogs = [];
+        DigitoolActionLogStore.wireArray(respondentIdFromUrl, 'degree', actionLogs, {
+          reset: true,
+          taskName: 'DegreeSequence1'
+        });
+        actionLogs.push({ action: 'task_loaded', task_name: 'DegreeSequence1' });
+        const detachWindowScrollLoggerDegree1 = attachWindowScrollLogger((action, detail) => {
+          actionLogs.push({ action, ...detail });
+        }, 'DegreeSequence1');
+        let feedbackEnabled = false; // Výchozí stav: zpětná vazba je vypnutá
+        let degreeDragValue = null;
+        let degreeDragDropped = false;
+        let suppressNumpadClick = false;
+        
+        let ghostState = 1; 
+        let familiarityAnswer1 = null;
+        let degreeSelfAssessmentOpen = false;
+
+        const ghostText = document.getElementById('ghost-text');
+        const ghostButtons = document.getElementById('ghost-buttons');
+        const ghostBubble = document.getElementById('ghost-bubble');
+        const ghostUI = document.getElementById('ghost-ui');
+        const ghostCharacter = document.getElementById('ghost-character');
+
+        // Zviditelnit bublinu hned na začátku
+        ghostBubble.classList.add('visible');
+
+        document.getElementById('ghost-blocker').addEventListener('click', () => {
+            showHintBanner('hint-must-answer');
+            actionLogs.push({ time: Date.now(), action: 'click_blocked_task' });
+        });
+        const blockUntilGhostIntroAnswered = (source) => {
+            if (ghostState === 1 || ghostState === 2) {
+                showHintBanner('hint-must-answer');
+                actionLogs.push({ time: Date.now(), action: 'click_blocked_before_intro_answer', source: source });
+                return true;
+            }
+            return false;
+        };
+
+        // --- OBSLUHA OTÁZEK BÍLÉ PANÍ ---
+        const wireGhostQ1Buttons = () => {
+            document.getElementById('ghost-btn-yes').addEventListener('click', () => handleGhostAnswer('yes'));
+            document.getElementById('ghost-btn-unknown').addEventListener('click', () => handleGhostAnswer('unsure'));
+            document.getElementById('ghost-btn-no').addEventListener('click', () => handleGhostAnswer('no'));
+        };
+
+        const showGhostQ1 = () => {
+            ghostState = 1;
+            familiarityAnswer1 = null;
+            ghostText.textContent = 'Oletko joskus ratkaissut samankaltaisen tehtävän?';
+            ghostButtons.innerHTML = `
+                <button id="ghost-btn-yes" style="padding: 10px 15px; border: none; border-radius: 8px; background: #28a745; color: white; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s;">Kyllä</button>
+                <button id="ghost-btn-unknown" style="padding: 10px 15px; border: none; border-radius: 8px; background: #007bff; color: white; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s;">En tiedä</button>
+                <button id="ghost-btn-no" style="padding: 10px 15px; border: none; border-radius: 8px; background: #dc3545; color: white; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s;">Ei</button>
+              `;
+            ghostButtons.style.flexDirection = 'row';
+            wireGhostQ1Buttons();
+        };
+
+        const showGhostQ2 = () => {
+            ghostState = 2;
+            ghostText.innerHTML = 'Jos tarvitset vihjettä,<br>napsauta minua.';
+            ghostButtons.style.flexDirection = 'column';
+            ghostButtons.innerHTML = `
+                  <button id="ghost-btn-minimize" style="padding: 10px 15px; border: none; border-radius: 8px; background: #28a745; color: white; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s;">Haluan aloittaa työskentelyn.</button>
+                  <button id="ghost-btn-help-now" style="padding: 10px 15px; border: none; border-radius: 8px; background: #007bff; color: white; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s;">Haluan vihjeen.</button>
+                  <button id="ghost-btn-back" style="padding: 10px 15px; border: none; border-radius: 8px; background: #6c757d; color: white; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s;">Takaisin</button>
+                `;
+
+            document.getElementById('ghost-btn-minimize').addEventListener('click', () => {
+                ghostUI.style.transform = 'scale(0.6)';
+                ghostBubble.classList.remove('visible');
+                if (document.getElementById('ghost-blocker')) document.getElementById('ghost-blocker').remove();
+                document.getElementById('hint-must-answer').style.display = 'none';
+                document.getElementById('hint-box-2').style.display = 'none';
+                document.getElementById('hint-box-3').style.display = 'none';
+                ghostState = 3;
+                actionLogs.push({ time: Date.now(), action: 'ghost_minimized' });
+            });
+
+            document.getElementById('ghost-btn-help-now').addEventListener('click', () => {
+                if (document.getElementById('ghost-blocker')) document.getElementById('ghost-blocker').remove();
+                document.getElementById('hint-must-answer').style.display = 'none';
+                document.getElementById('hint-box-2').style.display = 'none';
+                document.getElementById('hint-box-3').style.display = 'none';
+                ghostState = 3;
+                actionLogs.push({ time: Date.now(), action: 'ghost_help_requested_from_intro' });
+                ghostCharacter.click();
+            });
+
+            document.getElementById('ghost-btn-back').addEventListener('click', () => {
+                actionLogs.push({ time: Date.now(), action: 'ghost_intro_back_clicked', from_step: 2, to_step: 1 });
+                showGhostQ1();
+            });
+        };
+
+        const handleGhostAnswer = (answer) => {
+            if (ghostState === 1) {
+                familiarityAnswer1 = answer;
+                actionLogs.push({
+                    time: Date.now(),
+                    action: 'ghost_q1_answered',
+                    question: 'prior_similar_task',
+                    answer
+                });
+                showGhostQ2();
+            }
+        };
+
+        wireGhostQ1Buttons();
+
+        // --- DATA GRAFU Z LATEXU ---
+        const nodes = [
+          {id: 1, x: 160, y: 60,  degree: null},
+          {id: 2, x: 320, y: 60,  degree: null},
+          {id: 3, x: 80,  y: 160, degree: null},
+          {id: 4, x: 240, y: 160, degree: null},
+          {id: 5, x: 380, y: 135, degree: null},
+          {id: 6, x: 210, y: 260, degree: null}
+        ];
+        
+        const edges = [
+          {u: 1, v: 2}, {u: 1, v: 3}, {u: 1, v: 4}, {u: 1, v: 6},
+          {u: 2, v: 4}, {u: 2, v: 5}, {u: 3, v: 4}, {u: 3, v: 6},
+          {u: 4, v: 5}, {u: 4, v: 6}, {u: 5, v: 6}
+        ];
+        
+        const correctDegrees = {};
+        nodes.forEach(n => correctDegrees[n.id] = 0);
+        edges.forEach(edge => {
+            if(correctDegrees[edge.u] !== undefined) correctDegrees[edge.u]++;
+            if(correctDegrees[edge.v] !== undefined) correctDegrees[edge.v]++;
+        });
+
+        let degree1ScaleActive = false;
+        let degree1IncidentAwait = false;
+        let degree1IncidentNodeId = null;
+        let degree1CheckActive = false;
+
+        const showDegree1Orange = (message) => {
+            const el = document.getElementById('degree1-orange-hint');
+            if (!el) return;
+            el.textContent = message;
+            showHintBanner(el);
+        };
+        const hideDegree1Orange = () => {
+            const el = document.getElementById('degree1-orange-hint');
+            if (!el) return;
+            el.style.display = 'none';
+            el.textContent = '';
+        };
+        const clearDegree1Scale = (source) => {
+            if (!degree1ScaleActive) return;
+            nodes.forEach((n) => {
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                if (!group) return;
+                const icon = group.querySelector('.town-icon');
+                const highlight = group.querySelector('.town-highlight');
+                if (icon) icon.style.fontSize = '';
+                if (highlight) highlight.setAttribute('r', '32');
+            });
+            degree1ScaleActive = false;
+            actionLogs.push({ time: Date.now(), action: 'degree1_hint_scale_cleared', source });
+        };
+        const applyDegree1Scale = () => {
+            const degrees = nodes.map((n) => correctDegrees[n.id]);
+            const minDegree = Math.min(...degrees);
+            const maxDegree = Math.max(...degrees);
+            const span = Math.max(1, maxDegree - minDegree);
+            const sized = nodes.map((n) => {
+                const degree = correctDegrees[n.id];
+                const t = (degree - minDegree) / span;
+                const fontSize = Math.round(22 + t * 24);
+                const highlightR = Math.round(26 + t * 14);
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                if (group) {
+                    const icon = group.querySelector('.town-icon');
+                    const highlight = group.querySelector('.town-highlight');
+                    if (icon) icon.style.fontSize = fontSize + 'px';
+                    if (highlight) highlight.setAttribute('r', String(highlightR));
+                }
+                return { node: n.id, degree, font_size: fontSize, highlight_r: highlightR };
+            });
+            degree1ScaleActive = true;
+            actionLogs.push({
+                time: Date.now(),
+                action: 'degree1_hint_scale_applied',
+                min_degree: minDegree,
+                max_degree: maxDegree,
+                nodes: sized
+            });
+        };
+        const clearDegree1Incident = (source) => {
+            const marked = svg.querySelectorAll('.road.degree1-incident');
+            if (!degree1IncidentAwait && marked.length === 0 && degree1IncidentNodeId === null) return;
+            marked.forEach((el) => el.classList.remove('degree1-incident'));
+            actionLogs.push({
+                time: Date.now(),
+                action: 'degree1_hint_incident_cleared',
+                source,
+                node: degree1IncidentNodeId,
+                was_waiting_for_click: degree1IncidentAwait
+            });
+            degree1IncidentAwait = false;
+            degree1IncidentNodeId = null;
+        };
+        const showDegree1Incident = (nodeId) => {
+            svg.querySelectorAll('.road.degree1-incident').forEach((el) => el.classList.remove('degree1-incident'));
+            const incident = edges.filter((edge) => edge.u === nodeId || edge.v === nodeId);
+            incident.forEach((edge) => {
+                const road = svg.querySelector(`.road[data-u="${edge.u}"][data-v="${edge.v}"]`);
+                if (road) road.classList.add('degree1-incident');
+            });
+            degree1IncidentAwait = false;
+            degree1IncidentNodeId = nodeId;
+            hideDegree1Orange();
+            actionLogs.push({
+                time: Date.now(),
+                action: 'degree1_hint_incident_shown',
+                node: nodeId,
+                degree: correctDegrees[nodeId],
+                edge_count: incident.length,
+                edges: incident.map((edge) => ({ u: edge.u, v: edge.v }))
+            });
+        };
+        const clearDegree1Check = (source) => {
+            if (!degree1CheckActive) return;
+            nodes.forEach((n) => {
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                if (group) group.classList.remove('correct', 'incorrect');
+            });
+            degree1CheckActive = false;
+            feedbackEnabled = false;
+            actionLogs.push({ time: Date.now(), action: 'degree1_hint_check_cleared', source });
+        };
+        const applyDegree1Check = () => {
+            const marked = [];
+            let emptyIgnored = 0;
+            nodes.forEach((n) => {
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                if (!group) return;
+                group.classList.remove('correct', 'incorrect');
+                if (n.degree === null) {
+                    emptyIgnored += 1;
+                    return;
+                }
+                const isCorrect = n.degree === correctDegrees[n.id];
+                group.classList.add(isCorrect ? 'correct' : 'incorrect');
+                marked.push({
+                    node: n.id,
+                    value: n.degree,
+                    correct_degree: correctDegrees[n.id],
+                    is_correct: isCorrect
+                });
+            });
+            degree1CheckActive = true;
+            feedbackEnabled = false;
+            actionLogs.push({
+                time: Date.now(),
+                action: 'degree1_hint_check_shown',
+                marked,
+                correct_count: marked.filter((item) => item.is_correct).length,
+                incorrect_count: marked.filter((item) => !item.is_correct).length,
+                empty_ignored: emptyIgnored
+            });
+        };
+        const closeDegree1GhostMenu = () => {
+            ghostBubble.classList.remove('visible', 'degree1-hint-menu-wide');
+            ghostUI.style.transform = 'scale(0.6)';
+        };
+
+        // --- OBSLUHA NÁPOVĚDY (Kliknutí na paní) ---
+        ghostCharacter.addEventListener('click', () => {
+            if (degreeSelfAssessmentOpen) return;
+            if (ghostState === 1 || ghostState === 2) {
+                actionLogs.push({ time: Date.now(), action: 'ghost_clicked_during_intro' });
+                ghostBubble.classList.add('visible');
+                ghostUI.style.transform = 'scale(1)';
+                if (ghostState === 1) {
+                    ghostButtons.style.flexDirection = 'row';
+                }
+                return;
+            }
+            if (ghostState === 3) { 
+                actionLogs.push({ time: Date.now(), action: 'ghost_clicked_for_hint' });
+                ghostText.innerHTML = 'Miten voin auttaa?';
+                ghostButtons.style.flexDirection = 'column';
+                ghostButtons.innerHTML = `
+                    <button id="hint-scale" class="ghost-hint-btn" data-hint-key="scale_by_degree">Muuta linnojen kokoa sen mukaan, kuinka monta tietä niistä lähtee.</button>
+                    <button id="hint-incident" class="ghost-hint-btn" data-hint-key="incident_edges">Korosta kaikki tiet, jotka lähtevät yhdestä linnasta.</button>
+                    <button id="hint-check" class="ghost-hint-btn" data-hint-key="check_filled">Tarkista linnat, joihin olen jo merkinnyt numeron.</button>
+                    <button id="ghost-hint-close" class="ghost-hint-btn" style="background: #6c757d;">Sulje vihje</button>
+                `;
+                ghostBubble.classList.add('visible', 'degree1-hint-menu-wide');
+                ghostUI.style.transform = 'scale(1)';
+
+                document.getElementById('hint-scale').addEventListener('click', () => {
+                    actionLogs.push({
+                        time: Date.now(),
+                        action: 'ghost_hint_clicked',
+                        hint_key: 'scale_by_degree',
+                        label: 'Uprav velikost hradů podle toho, kolik z nich vede cest.'
+                    });
+                    clearDegree1Incident('scale_hint');
+                    clearDegree1Check('scale_hint');
+                    hideDegree1Orange();
+                    applyDegree1Scale();
+                    closeDegree1GhostMenu();
+                });
+
+                document.getElementById('hint-incident').addEventListener('click', () => {
+                    actionLogs.push({
+                        time: Date.now(),
+                        action: 'ghost_hint_clicked',
+                        hint_key: 'incident_edges',
+                        label: 'Zvýrazni mi všechny cesty vedoucí z jednoho hradu.'
+                    });
+                    clearDegree1Check('incident_hint');
+                    clearDegree1Incident('incident_hint');
+                    degree1IncidentAwait = true;
+                    showDegree1Orange('Napsauta yhtä linnaa, niin väritän tiet, jotka siitä lähtevät.');
+                    actionLogs.push({ time: Date.now(), action: 'degree1_hint_incident_activated' });
+                    closeDegree1GhostMenu();
+                });
+
+                document.getElementById('hint-check').addEventListener('click', () => {
+                    actionLogs.push({
+                        time: Date.now(),
+                        action: 'ghost_hint_clicked',
+                        hint_key: 'check_filled',
+                        label: 'Zkontroluj mi hrady, u kterých už mám číslo.'
+                    });
+                    clearDegree1Incident('check_hint');
+                    hideDegree1Orange();
+                    applyDegree1Check();
+                    closeDegree1GhostMenu();
+                });
+
+                document.getElementById('ghost-hint-close').addEventListener('click', () => {
+                    actionLogs.push({ time: Date.now(), action: 'ghost_hint_closed' });
+                    closeDegree1GhostMenu();
+                });
+            }
+            console.log('DegreeSequence1: ghostCharacter click handler finished.');
+        });
+
+        // --- VYKRESLENÍ CEST ---
+        edges.forEach(edge => {
+            const nodeU = nodes.find(n => n.id === edge.u);
+            const nodeV = nodes.find(n => n.id === edge.v);
+            const roadGroup = document.createElementNS(svgNS, 'g');
+            roadGroup.classList.add('road');
+            roadGroup.dataset.u = String(edge.u);
+            roadGroup.dataset.v = String(edge.v);
+            
+            const asphalt = document.createElementNS(svgNS, 'line');
+            asphalt.setAttribute('x1', nodeU.x); asphalt.setAttribute('y1', nodeU.y);
+            asphalt.setAttribute('x2', nodeV.x); asphalt.setAttribute('y2', nodeV.y);
+            asphalt.setAttribute('stroke', '#666'); asphalt.setAttribute('stroke-width', '14');
+            asphalt.classList.add('degree1-asphalt');
+            
+            const centerLine = document.createElementNS(svgNS, 'line');
+            centerLine.setAttribute('x1', nodeU.x); centerLine.setAttribute('y1', nodeU.y);
+            centerLine.setAttribute('x2', nodeV.x); centerLine.setAttribute('y2', nodeV.y);
+            centerLine.setAttribute('stroke', '#fff'); centerLine.setAttribute('stroke-width', '2');
+            centerLine.setAttribute('stroke-dasharray', '8,8');
+            
+            roadGroup.appendChild(asphalt); roadGroup.appendChild(centerLine);
+            svg.appendChild(roadGroup);
+        });
+
+        // --- VYKRESLENÍ HRADŮ ---
+        const syncNumpadSelectionUi = () => {
+            numpad.querySelectorAll('.numpad-btn').forEach((btn) => {
+                const value = Number(btn.dataset.value);
+                btn.classList.toggle('selected', selectedValue !== null && value === selectedValue);
+            });
+        };
+
+        const clearTownSelectionUi = () => {
+            document.querySelectorAll('.deg-node').forEach((n) => n.classList.remove('selected'));
+            selectedNodeId = null;
+        };
+
+        const clearNumberSelection = (logDeselect = false) => {
+            if (logDeselect && selectedValue !== null) {
+                actionLogs.push({ time: Date.now(), action: 'deselect_number', value: selectedValue });
+            }
+            selectedValue = null;
+            syncNumpadSelectionUi();
+        };
+
+        const applyDegreeToNode = (nodeId, value, method) => {
+            const nodeData = nodes.find((n) => n.id === nodeId);
+            if (!nodeData) return false;
+            const activeGroup = svg.querySelector(`g[data-id="${nodeId}"]`);
+            if (!activeGroup) return false;
+            const hintSource = method === 'drag' ? 'set_degree_drag' : 'set_degree';
+            clearDegree1Check(hintSource);
+            const previousDegree = nodeData.degree;
+            nodeData.degree = value;
+
+            activeGroup.querySelector('.badge-text').textContent = value;
+
+            const isCorrect = value === correctDegrees[nodeId];
+            activeGroup.classList.remove('correct', 'incorrect', 'selected', 'drag-over');
+            if (feedbackEnabled) {
+                activeGroup.classList.add(isCorrect ? 'correct' : 'incorrect');
+            }
+
+            actionLogs.push({
+                time: Date.now(),
+                action: 'set_degree',
+                node: nodeId,
+                value,
+                previous_value: previousDegree,
+                is_correct: isCorrect,
+                feedback_shown: feedbackEnabled,
+                method
+            });
+            selectedNodeId = null;
+            clearNumberSelection(false);
+            return true;
+        };
+
+        const findDegNodeGroupAtPoint = (clientX, clientY) => {
+            const el = document.elementFromPoint(clientX, clientY);
+            return el ? el.closest('g.deg-node') : null;
+        };
+
+        nodes.forEach(node => {
+            const group = document.createElementNS(svgNS, 'g');
+            group.classList.add('deg-node');
+            group.dataset.id = node.id;
+            
+            const highlight = document.createElementNS(svgNS, 'circle');
+            highlight.setAttribute('cx', node.x); highlight.setAttribute('cy', node.y);
+            highlight.setAttribute('r', 32);
+            highlight.classList.add('town-highlight');
+            
+            const icon = document.createElementNS(svgNS, 'text');
+            icon.setAttribute('x', node.x); icon.setAttribute('y', node.y);
+            icon.textContent = "🏰"; // ZMĚNĚNO NA HRAD!
+            icon.classList.add('town-icon');
+            
+            const badgeBg = document.createElementNS(svgNS, 'circle');
+            badgeBg.setAttribute('cx', node.x + 18); badgeBg.setAttribute('cy', node.y - 18);
+            badgeBg.setAttribute('r', 12);
+            badgeBg.classList.add('badge-bg');
+            
+            const badgeText = document.createElementNS(svgNS, 'text');
+            badgeText.setAttribute('x', node.x + 18); badgeText.setAttribute('y', node.y - 18);
+            badgeText.textContent = "";
+            badgeText.classList.add('badge-text');
+            
+            group.appendChild(highlight);
+            group.appendChild(icon);
+            group.appendChild(badgeBg);
+            group.appendChild(badgeText);
+            svg.appendChild(group);
+            
+            group.addEventListener('click', () => {
+                if (degree1IncidentAwait) showDegree1Incident(node.id);
+                document.querySelectorAll('.deg-node').forEach((n) => n.classList.remove('selected'));
+                selectedNodeId = node.id;
+                group.classList.add('selected');
+                const hint = document.getElementById('hint-box-3');
+                if (hint && hint.textContent && hint.textContent.includes('sitten numeroa numerotaulussa')) {
+                    hint.style.display = 'none';
+                }
+                actionLogs.push({ time: Date.now(), action: 'select_town', node: node.id });
+            });
+
+            group.addEventListener('dragover', (e) => {
+                if (degreeDragValue === null) return;
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+                group.classList.add('drag-over');
+            });
+            group.addEventListener('dragleave', () => {
+                group.classList.remove('drag-over');
+            });
+            group.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                group.classList.remove('drag-over');
+                const raw = e.dataTransfer ? e.dataTransfer.getData('text/plain') : '';
+                const value = raw === '' ? degreeDragValue : Number(raw);
+                if (value === null || Number.isNaN(value)) {
+                    actionLogs.push({ time: Date.now(), action: 'drop_invalid', node: node.id, reason: 'bad_value' });
+                    return;
+                }
+                degreeDragDropped = true;
+                applyDegreeToNode(node.id, value, 'drag');
+            });
+        });
+
+        svg.addEventListener('click', (e) => {
+            if (!degree1IncidentAwait) return;
+            if (e.target.closest && e.target.closest('.deg-node')) return;
+            actionLogs.push({ time: Date.now(), action: 'degree1_hint_incident_click_ignored', reason: 'not_a_town' });
+        });
+
+        svg.addEventListener('dragover', (e) => {
+            if (degreeDragValue === null) return;
+            const targetGroup = findDegNodeGroupAtPoint(e.clientX, e.clientY);
+            document.querySelectorAll('.deg-node.drag-over').forEach((g) => {
+                if (g !== targetGroup) g.classList.remove('drag-over');
+            });
+            if (!targetGroup) return;
+            e.preventDefault();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+            targetGroup.classList.add('drag-over');
+        });
+        svg.addEventListener('drop', (e) => {
+            if (degreeDragValue === null) return;
+            e.preventDefault();
+            const targetGroup = findDegNodeGroupAtPoint(e.clientX, e.clientY);
+            document.querySelectorAll('.deg-node.drag-over').forEach((g) => g.classList.remove('drag-over'));
+            if (!targetGroup) {
+                actionLogs.push({ time: Date.now(), action: 'drop_invalid', reason: 'no_town' });
+                return;
+            }
+            const raw = e.dataTransfer ? e.dataTransfer.getData('text/plain') : '';
+            const value = raw === '' ? degreeDragValue : Number(raw);
+            const nodeId = Number(targetGroup.dataset.id);
+            if (value === null || Number.isNaN(value) || Number.isNaN(nodeId)) {
+                actionLogs.push({ time: Date.now(), action: 'drop_invalid', node: nodeId, reason: 'bad_value' });
+                return;
+            }
+            degreeDragDropped = true;
+            applyDegreeToNode(nodeId, value, 'drag');
+        });
+
+        // --- ČÍSELNÍK ---
+        for (let i = 0; i <= 9; i++) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'numpad-btn';
+            btn.textContent = i;
+            btn.dataset.value = String(i);
+            btn.draggable = true;
+
+            btn.addEventListener('dragstart', (e) => {
+                degreeDragValue = i;
+                degreeDragDropped = false;
+                suppressNumpadClick = true;
+                clearTownSelectionUi();
+                if (e.dataTransfer) {
+                    e.dataTransfer.setData('text/plain', String(i));
+                    e.dataTransfer.effectAllowed = 'copy';
+                }
+                actionLogs.push({
+                    time: Date.now(),
+                    action: 'drag_start',
+                    kind: 'number',
+                    value: i,
+                    source: 'numpad'
+                });
+            });
+
+            btn.addEventListener('dragend', () => {
+                actionLogs.push({
+                    time: Date.now(),
+                    action: 'drag_end',
+                    kind: 'number',
+                    value: i,
+                    source: 'numpad',
+                    dropped: degreeDragDropped
+                });
+                degreeDragValue = null;
+                degreeDragDropped = false;
+                document.querySelectorAll('.deg-node.drag-over').forEach((g) => g.classList.remove('drag-over'));
+                setTimeout(() => { suppressNumpadClick = false; }, 0);
+            });
+
+            btn.addEventListener('click', () => {
+                if (suppressNumpadClick) return;
+                if (selectedNodeId === null) {
+                    document.getElementById('hint-box-2').style.display = 'none';
+                    const hint = document.getElementById('hint-box-3');
+                    hint.textContent = 'Napsauta ensin linnaa ja sitten numeroa numerotaulussa.';
+                    showHintBanner('hint-box-3');
+                    actionLogs.push({ time: Date.now(), action: 'select_number_failed_no_town', value: i });
+                    return;
+                }
+                document.getElementById('hint-box-3').style.display = 'none';
+                applyDegreeToNode(selectedNodeId, i, 'click');
+            });
+            numpad.appendChild(btn);
+        }
+
+// --- VLOŽIT NA KONEC on_load (Před ukládání dat) ---
+        
+        // 1. Schovat nápovědu
+        document.getElementById('btn-hide-hint').addEventListener('click', () => {
+            if (blockUntilGhostIntroAnswered('btn-hide-hint')) return;
+            document.getElementById('hint-box-2').style.display = 'none';
+            document.getElementById('hint-box-3').style.display = 'none';
+            clearDegree1Scale('hide_hint');
+            clearDegree1Incident('hide_hint');
+            clearDegree1Check('hide_hint');
+            hideDegree1Orange();
+            feedbackEnabled = false; // Vypne barvičky
+            nodes.forEach(n => { // Smaže aktuální barvičky
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                group.classList.remove('correct', 'incorrect');
+            });
+            actionLogs.push({ time: Date.now(), action: 'hide_hint' });
+        });
+
+        // 2. Smazat číslo
+        document.getElementById('btn-delete').addEventListener('click', () => {
+            if (blockUntilGhostIntroAnswered('btn-delete')) return;
+            if (selectedNodeId !== null) {
+                const node = nodes.find(n => n.id === selectedNodeId);
+                clearDegree1Check('delete_number');
+                node.degree = null; // Vymaže číslo z dat
+                const activeGroup = svg.querySelector(`g[data-id="${selectedNodeId}"]`);
+                activeGroup.querySelector('.badge-text').textContent = ""; // Vymaže číslo z obrázku
+                activeGroup.classList.remove('correct', 'incorrect');
+                document.getElementById('hint-box-2').style.display = 'none';
+                document.getElementById('hint-box-3').style.display = 'none';
+                actionLogs.push({ time: Date.now(), action: 'delete_number', node: selectedNodeId });
+            } else {
+                document.getElementById('hint-box-2').style.display = 'none';
+                const hint = document.getElementById('hint-box-3');
+                hint.textContent = 'Napsauta ensin linnaa, jonka numeron haluat poistaa, ja sitten painiketta Poista numero.';
+                showHintBanner('hint-box-3');
+                actionLogs.push({ time: Date.now(), action: 'delete_number_failed_no_selection' });
+            }
+        });
+
+        // 3. Začít znovu
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            if (blockUntilGhostIntroAnswered('btn-restart')) return;
+            clearDegree1Incident('restart_task');
+            clearDegree1Check('restart_task');
+            hideDegree1Orange();
+            nodes.forEach(n => {
+                n.degree = null; // Vymaže všechna data
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                group.querySelector('.badge-text').textContent = "";
+                group.classList.remove('correct', 'incorrect', 'selected', 'drag-over');
+            });
+            selectedNodeId = null;
+            clearNumberSelection(false);
+            feedbackEnabled = false;
+            document.getElementById('hint-box-2').style.display = 'none';
+            document.getElementById('hint-box-3').style.display = 'none';
+            actionLogs.push({ time: Date.now(), action: 'restart_task' });
+        });
+
+        const clearDegree1OutcomeMarks = () => {
+            nodes.forEach((n) => {
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                if (group) group.classList.remove('correct', 'incorrect');
+            });
+        };
+
+        const revealDegree1CorrectDegrees = () => {
+            nodes.forEach((n) => {
+                const want = correctDegrees[n.id];
+                n.degree = want;
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                if (!group) return;
+                const badge = group.querySelector('.badge-text');
+                if (badge) badge.textContent = String(want);
+                group.classList.remove('incorrect', 'selected');
+                group.classList.add('correct');
+            });
+        };
+
+        const hideDegree1OutcomeGhost = () => {
+            ghostBubble.classList.remove('degree-self-assessment-wide', 'visible');
+            ghostUI.style.transform = 'scale(0.6)';
+            ghostButtons.innerHTML = '';
+        };
+
+        const showDegreeSequence1OutcomeFeedback = async (allCorrect) => {
+            actionLogs.push({ time: Date.now(), action: 'outcome_feedback_shown', all_correct: allCorrect });
+            ghostUI.style.transform = 'scale(1)';
+            ghostButtons.style.flexDirection = 'column';
+            ghostBubble.classList.add('degree-self-assessment-wide', 'visible');
+            if (allCorrect) {
+                ghostText.innerHTML = 'Hienoa, ratkaisu on oikein!';
+                ghostButtons.innerHTML = '<button type="button" id="degree1-feedback-continue" class="ghost-hint-btn">Jatka</button>';
+                return new Promise((resolve) => {
+                    document.getElementById('degree1-feedback-continue').addEventListener('click', () => {
+                        actionLogs.push({ time: Date.now(), action: 'outcome_correct_continue_clicked', all_correct: true });
+                        hideDegree1OutcomeGhost();
+                        resolve('finish');
+                    }, { once: true });
+                });
+            }
+            ghostText.innerHTML = 'Siinä on virhe. Näytän, mitkä kohdat ovat väärin, mutta en paljasta ratkaisua.';
+            ghostButtons.innerHTML = `
+              <button type="button" id="degree1-feedback-retry" class="ghost-hint-btn">Haluan yrittää korjata sen</button>
+              <button type="button" id="degree1-feedback-solution" class="ghost-hint-btn">Näytä minulle oikea ratkaisu</button>
+            `;
+            return new Promise((resolve) => {
+                document.getElementById('degree1-feedback-retry').addEventListener('click', () => {
+                    actionLogs.push({ time: Date.now(), action: 'outcome_incorrect_retry_clicked' });
+                    clearDegree1OutcomeMarks();
+                    actionLogs.push({ time: Date.now(), action: 'outcome_returned_to_solving' });
+                    hideDegree1OutcomeGhost();
+                    ghostText.innerHTML = 'Jos tarvitset vihjettä,<br>napsauta minua.';
+                    degreeSelfAssessmentOpen = false;
+                    setDigitoolSelfAssessmentUiLock(false);
+                    resolve('retry');
+                }, { once: true });
+                document.getElementById('degree1-feedback-solution').addEventListener('click', () => {
+                    actionLogs.push({ time: Date.now(), action: 'outcome_incorrect_show_solution_clicked' });
+                    revealDegree1CorrectDegrees();
+                    ghostText.innerHTML = 'Oikea ratkaisu näyttää tältä.';
+                    ghostButtons.innerHTML = '<button type="button" id="degree1-feedback-solution-continue" class="ghost-hint-btn">Jatka</button>';
+                    document.getElementById('degree1-feedback-solution-continue').addEventListener('click', () => {
+                        actionLogs.push({ time: Date.now(), action: 'outcome_solution_continue_clicked' });
+                        hideDegree1OutcomeGhost();
+                        resolve('finish');
+                    }, { once: true });
+                }, { once: true });
+            });
+        };
+
+        const finishDegreeSequence1TrialWithAssessment = async (selfAssessmentCode, selfAssessmentLabel) => {
+            const t = Date.now();
+            actionLogs.push({
+                time: t,
+                action: 'self_assessment_chosen',
+                self_assessment: selfAssessmentCode,
+                self_assessment_label: selfAssessmentLabel
+            });
+            actionLogs.push({ time: t, action: 'finish_task_confirmed' });
+            clearDegree1Scale('outcome_feedback');
+            clearDegree1Incident('outcome_feedback');
+            hideDegree1Orange();
+            if (degree1CheckActive) {
+                degree1CheckActive = false;
+                feedbackEnabled = false;
+                actionLogs.push({ time: Date.now(), action: 'degree1_hint_check_cleared', source: 'outcome_feedback' });
+            }
+            ghostBubble.classList.remove('degree-self-assessment-wide', 'visible');
+            ghostUI.style.transform = 'scale(0.6)';
+            if (blockUntilGhostIntroAnswered('btn-next')) {
+                degreeSelfAssessmentOpen = false;
+                return;
+            }
+            const finalDegreesSnapshot = nodes.map(n => ({
+              id: n.id,
+              degree: n.degree,
+              correct_degree: correctDegrees[n.id],
+              is_correct: n.degree !== null && n.degree === correctDegrees[n.id]
+            }));
+            const allCorrect = finalDegreesSnapshot.every(v => v.is_correct);
+
+            if (!allCorrect) {
+                nodes.forEach(n => {
+                    const activeGroup = svg.querySelector(`g[data-id="${n.id}"]`);
+                    if (!activeGroup) return;
+                    const isCorrect = n.degree !== null && n.degree === correctDegrees[n.id];
+                    activeGroup.classList.remove('correct', 'incorrect', 'selected');
+                    if (isCorrect) activeGroup.classList.add('correct');
+                    else activeGroup.classList.add('incorrect');
+                });
+                actionLogs.push({
+                    time: Date.now(),
+                    action: 'degree1_post_feedback_student_solution_marked',
+                    all_correct: allCorrect
+                });
+            }
+
+            const outcomeChoice = await showDegreeSequence1OutcomeFeedback(allCorrect);
+            if (outcomeChoice === 'retry') return;
+            degreeSelfAssessmentOpen = false;
+            const trialData = {
+                task_name: 'DegreeSequence1',
+                action_logs: actionLogs
+            };
+            console.log('DegreeSequence1: trialData prepared:', trialData);
+            detachWindowScrollLoggerDegree1();
+            jsPsych.finishTrial(trialData);
+        };
+
+        const showDegreeSequence1SelfAssessmentDialog = () => {
+            if (blockUntilGhostIntroAnswered('btn-next')) return;
+            actionLogs.push({ time: Date.now(), action: 'btn_next_clicked_self_assessment_shown' });
+            degreeSelfAssessmentOpen = true;
+            setDigitoolSelfAssessmentUiLock(true);
+            ghostUI.style.transform = 'scale(1)';
+            ghostText.innerHTML = 'Onko tehtävä mielestäsi oikein?';
+            ghostButtons.style.flexDirection = 'column';
+            ghostButtons.innerHTML = `
+              <button type="button" id="degree-self-continue" class="ghost-hint-btn">Haluan vielä jatkaa ratkaisemista.</button>
+              <button type="button" id="degree-self-sure-correct" class="ghost-hint-btn">Tiedän varmasti, että tehtävä on oikein.</button>
+              <button type="button" id="degree-self-correct" class="ghost-hint-btn">Luulen, että tehtävä on oikein.</button>
+              <button type="button" id="degree-self-unsure" class="ghost-hint-btn">En ole varma, onko tehtävä oikein.</button>
+              <button type="button" id="degree-self-error" class="ghost-hint-btn">Luulen, että tehtävässä on virhe, mutta en halua enää jatkaa ratkaisemista.</button>
+            `;
+            ghostBubble.classList.add('degree-self-assessment-wide', 'visible');
+
+            document.getElementById('degree-self-continue').addEventListener('click', () => {
+                actionLogs.push({
+                    time: Date.now(),
+                    action: 'self_assessment_chosen',
+                    self_assessment: 'continue_solving',
+                    self_assessment_label: 'Chci ještě pokračovat v řešení.'
+                });
+                degreeSelfAssessmentOpen = false;
+                setDigitoolSelfAssessmentUiLock(false);
+                ghostBubble.classList.remove('degree-self-assessment-wide', 'visible');
+                ghostUI.style.transform = 'scale(0.6)';
+                ghostText.innerHTML = 'Jos tarvitset vihjettä,<br>napsauta minua.';
+                ghostButtons.innerHTML = '';
+            });
+            document.getElementById('degree-self-sure-correct').addEventListener('click', () => {
+                finishDegreeSequence1TrialWithAssessment('sure_correct', 'Vím jistě, že mám úlohu správně.');
+            });
+            document.getElementById('degree-self-correct').addEventListener('click', () => {
+                finishDegreeSequence1TrialWithAssessment('think_correct', 'Myslím si, že mám úlohu správně.');
+            });
+            document.getElementById('degree-self-unsure').addEventListener('click', () => {
+                finishDegreeSequence1TrialWithAssessment('unsure', 'Nevím jistě, zda mám úlohu správně.');
+            });
+            document.getElementById('degree-self-error').addEventListener('click', () => {
+                finishDegreeSequence1TrialWithAssessment('think_error', 'Myslím si, že mám v úloze chybu, ale už nechci pokračovat v řešení.');
+            });
+        };
+
+       // 4. Další úloha
+        document.getElementById('btn-next').addEventListener('click', () => {
+            if (degreeSelfAssessmentOpen) return;
+            showDegreeSequence1SelfAssessmentDialog();
+        });
+
+        setupDigitoolIdleGhostPrompt({
+          logAction: (action, detail = {}) => actionLogs.push({ time: Date.now(), action, ...detail }),
+          isIdleAllowed: () =>
+            ghostState === 3 &&
+            !degreeSelfAssessmentOpen &&
+            !document.body.classList.contains('digitool-self-assessment-lock') &&
+            !ghostBubble.classList.contains('degree-self-assessment-wide'),
+          ghostText,
+          ghostButtons,
+          ghostBubble,
+          ghostUI,
+          defaultGhostHtml: 'Jos tarvitset vihjettä,<br>napsauta minua.',
+          defaultGhostButtonsHtml: '',
+          onRequestHelp: () => {
+            ghostCharacter.click();
+          }
+        });
+      }
+    };
+
+
+    const createDegreeConnectHints = ({ taskKey, svg, nodes, getEdges, actionLogs }) => {
+        let scaleActive = false;
+        let countActive = false;
+        let suggestActive = false;
+        let checkActive = false;
+        let hoverNodeId = null;
+
+        const degreeOf = (id) => getEdges().filter((edge) => edge.u === id || edge.v === id).length;
+        const targetOf = (node) => parseInt(node.label, 10);
+        const nodeSnapshot = () => nodes.map((node) => ({
+            node: node.id,
+            target_degree: targetOf(node),
+            actual_degree: degreeOf(node.id)
+        }));
+        const orangeEl = () => document.getElementById('degree-connect-orange-hint');
+        const tipEl = () => document.getElementById('degree-connect-degree-tip');
+        const showOrange = (message) => {
+            const el = orangeEl();
+            if (!el) return;
+            el.textContent = message;
+            showHintBanner(el);
+        };
+        const hideOrange = () => {
+            const el = orangeEl();
+            if (!el) return;
+            el.style.display = 'none';
+            el.textContent = '';
+        };
+        const hideTip = () => {
+            const tip = tipEl();
+            if (!tip) return;
+            tip.style.display = 'none';
+            tip.textContent = '';
+        };
+        const showTip = (clientX, clientY, value) => {
+            const tip = tipEl();
+            if (!tip) return;
+            tip.textContent = String(value);
+            tip.style.display = 'flex';
+            tip.style.left = (clientX + 22) + 'px';
+            tip.style.top = (clientY + 18) + 'px';
+        };
+        const clearPulse = () => {
+            svg.querySelectorAll('.node.degree-connect-pulse').forEach((el) => el.classList.remove('degree-connect-pulse'));
+        };
+        const clearScale = (source) => {
+            if (!scaleActive) return;
+            nodes.forEach((node) => {
+                const group = svg.querySelector(`g[data-id="${node.id}"]`);
+                if (!group) return;
+                const icon = group.querySelector('.town-icon');
+                const highlight = group.querySelector('.town-highlight');
+                if (icon) icon.style.fontSize = '';
+                if (highlight) highlight.setAttribute('r', '32');
+            });
+            scaleActive = false;
+            actionLogs.push({ time: Date.now(), action: taskKey + '_hint_scale_cleared', source });
+        };
+        const clearCount = (source) => {
+            if (!countActive && hoverNodeId === null) return;
+            const container = document.getElementById('connect-container');
+            if (container) container.classList.remove('degree-count-mode');
+            hideTip();
+            actionLogs.push({
+                time: Date.now(),
+                action: taskKey + '_hint_count_cleared',
+                source,
+                hover_node: hoverNodeId
+            });
+            countActive = false;
+            hoverNodeId = null;
+        };
+        const clearSuggest = (source) => {
+            if (!suggestActive) return;
+            clearPulse();
+            suggestActive = false;
+            if (!countActive) hideOrange();
+            actionLogs.push({ time: Date.now(), action: taskKey + '_hint_suggest_cleared', source });
+        };
+        const clearCheck = (source) => {
+            if (!checkActive) return;
+            nodes.forEach((node) => {
+                const group = svg.querySelector(`g[data-id="${node.id}"]`);
+                if (group) group.classList.remove('correct', 'incorrect');
+            });
+            checkActive = false;
+            actionLogs.push({ time: Date.now(), action: taskKey + '_hint_check_cleared', source });
+        };
+        const applyScale = () => {
+            const targets = nodes.map((node) => targetOf(node));
+            const minTarget = Math.min(...targets);
+            const maxTarget = Math.max(...targets);
+            const span = Math.max(1, maxTarget - minTarget);
+            const sized = nodes.map((node) => {
+                const target = targetOf(node);
+                const t = (target - minTarget) / span;
+                const fontSize = Math.round(22 + t * 24);
+                const highlightR = Math.round(26 + t * 14);
+                const group = svg.querySelector(`g[data-id="${node.id}"]`);
+                if (group) {
+                    const icon = group.querySelector('.town-icon');
+                    const highlight = group.querySelector('.town-highlight');
+                    if (icon) icon.style.fontSize = fontSize + 'px';
+                    if (highlight) highlight.setAttribute('r', String(highlightR));
+                }
+                return { node: node.id, target_degree: target, font_size: fontSize, highlight_r: highlightR };
+            });
+            scaleActive = true;
+            actionLogs.push({
+                time: Date.now(),
+                action: taskKey + '_hint_scale_applied',
+                min_target: minTarget,
+                max_target: maxTarget,
+                nodes: sized
+            });
+        };
+        const applySuggest = () => {
+            const rows = nodeSnapshot().map((row) => ({ ...row, delta: row.actual_degree - row.target_degree }));
+            clearPulse();
+            if (rows.every((row) => row.delta === 0)) {
+                suggestActive = true;
+                showOrange('Jokaisesta linnasta lähtee juuri oikea määrä teitä. Tehtävä on valmis.');
+                actionLogs.push({
+                    time: Date.now(),
+                    action: taskKey + '_hint_suggest_shown',
+                    reason: 'complete',
+                    nodes: rows
+                });
+                return;
+            }
+            const missing = rows.filter((row) => row.actual_degree < row.target_degree)
+                .sort((a, b) => b.target_degree - a.target_degree || a.node - b.node);
+            if (missing.length) {
+                const pick = missing[0];
+                const group = svg.querySelector(`g[data-id="${pick.node}"]`);
+                if (group) group.classList.add('degree-connect-pulse');
+                suggestActive = true;
+                showOrange('Korostetusta linnasta puuttuu vielä teitä. Niitä pitäisi lähteä ' + pick.target_degree + ', nyt niitä lähtee ' + pick.actual_degree + '.');
+                actionLogs.push({
+                    time: Date.now(),
+                    action: taskKey + '_hint_suggest_shown',
+                    reason: 'missing',
+                    node: pick.node,
+                    target_degree: pick.target_degree,
+                    actual_degree: pick.actual_degree,
+                    candidates: missing,
+                    nodes: rows
+                });
+                return;
+            }
+            const excess = rows.filter((row) => row.actual_degree > row.target_degree)
+                .sort((a, b) => (b.actual_degree - b.target_degree) - (a.actual_degree - a.target_degree) || a.node - b.node);
+            const pick = excess[0];
+            const group = svg.querySelector(`g[data-id="${pick.node}"]`);
+            if (group) group.classList.add('degree-connect-pulse');
+            suggestActive = true;
+            showOrange('Korostetusta linnasta lähtee teitä enemmän kuin pitäisi. Niitä pitäisi lähteä ' + pick.target_degree + ', nyt niitä lähtee ' + pick.actual_degree + '.');
+            actionLogs.push({
+                time: Date.now(),
+                action: taskKey + '_hint_suggest_shown',
+                reason: 'excess',
+                node: pick.node,
+                target_degree: pick.target_degree,
+                actual_degree: pick.actual_degree,
+                surplus: pick.actual_degree - pick.target_degree,
+                candidates: excess,
+                nodes: rows
+            });
+        };
+        const applyCheck = () => {
+            const marked = [];
+            nodes.forEach((node) => {
+                const group = svg.querySelector(`g[data-id="${node.id}"]`);
+                if (!group) return;
+                group.classList.remove('correct', 'incorrect');
+                const actual = degreeOf(node.id);
+                const target = targetOf(node);
+                const isCorrect = actual === target;
+                group.classList.add(isCorrect ? 'correct' : 'incorrect');
+                marked.push({
+                    node: node.id,
+                    actual_degree: actual,
+                    target_degree: target,
+                    is_correct: isCorrect
+                });
+            });
+            checkActive = true;
+            actionLogs.push({
+                time: Date.now(),
+                action: taskKey + '_hint_check_shown',
+                marked,
+                correct_count: marked.filter((item) => item.is_correct).length,
+                incorrect_count: marked.filter((item) => !item.is_correct).length
+            });
+        };
+        const refreshHover = (source) => {
+            if (!countActive || hoverNodeId === null) return;
+            const actual = degreeOf(hoverNodeId);
+            const tip = tipEl();
+            if (tip && tip.style.display !== 'none') tip.textContent = String(actual);
+            actionLogs.push({
+                time: Date.now(),
+                action: taskKey + '_hint_count_refreshed',
+                source,
+                node: hoverNodeId,
+                actual_degree: actual,
+                target_degree: targetOf(nodes.find((node) => node.id === hoverNodeId))
+            });
+        };
+        const leaveHover = (source) => {
+            if (hoverNodeId === null) return;
+            actionLogs.push({
+                time: Date.now(),
+                action: taskKey + '_hint_count_hover_left',
+                source,
+                node: hoverNodeId
+            });
+            hoverNodeId = null;
+            hideTip();
+        };
+        svg.addEventListener('pointermove', (event) => {
+            if (!countActive) return;
+            const group = event.target && event.target.closest ? event.target.closest('g.node') : null;
+            if (!group || !svg.contains(group)) {
+                leaveHover('pointer_left_castle');
+                return;
+            }
+            const id = Number(group.dataset.id);
+            const actual = degreeOf(id);
+            showTip(event.clientX, event.clientY, actual);
+            if (hoverNodeId !== id) {
+                actionLogs.push({
+                    time: Date.now(),
+                    action: taskKey + '_hint_count_hover',
+                    node: id,
+                    actual_degree: actual,
+                    target_degree: targetOf(nodes.find((node) => node.id === id))
+                });
+                hoverNodeId = id;
+            }
+        });
+        svg.addEventListener('pointerleave', () => leaveHover('pointerleave'));
+
+        const closeMenu = (ghostBubble, ghostUI) => {
+            ghostBubble.classList.remove('visible', 'degree1-hint-menu-wide');
+            ghostUI.style.transform = 'scale(0.6)';
+        };
+        const openMenu = ({ ghostText, ghostButtons, ghostBubble, ghostUI }) => {
+            ghostText.textContent = 'Miten voin auttaa?';
+            ghostButtons.style.flexDirection = 'column';
+            ghostButtons.innerHTML = `
+                <button id="hint-scale" class="ghost-hint-btn" data-hint-key="scale_by_target_degree">Muuta linnojen kokoa sen mukaan, kuinka monta tietä niistä lähtee.</button>
+                <button id="hint-count" class="ghost-hint-btn" data-hint-key="count_drawn_edges">Laske piirrettyjen teiden määrä.</button>
+                <button id="hint-suggest" class="ghost-hint-btn" data-hint-key="suggest_castle">Neuvo, mihin linnaan minun pitää nyt tehdä teitä.</button>
+                <button id="hint-check" class="ghost-hint-btn" data-hint-key="check_progress">Tarkista, onko tehtävä tähän asti oikein.</button>
+                <button id="ghost-hint-close" class="ghost-hint-btn" style="background: #6c757d;">Sulje vihje</button>
+            `;
+            ghostBubble.classList.add('visible', 'degree1-hint-menu-wide');
+            ghostUI.style.transform = 'scale(1)';
+
+            document.getElementById('hint-scale').addEventListener('click', () => {
+                actionLogs.push({
+                    time: Date.now(),
+                    action: 'ghost_hint_clicked',
+                    hint_key: 'scale_by_target_degree',
+                    label: 'Uprav velikost hradů podle toho, kolik z nich vede cest.'
+                });
+                clearCount('scale_hint');
+                clearSuggest('scale_hint');
+                clearCheck('scale_hint');
+                hideOrange();
+                applyScale();
+                closeMenu(ghostBubble, ghostUI);
+            });
+            document.getElementById('hint-count').addEventListener('click', () => {
+                actionLogs.push({
+                    time: Date.now(),
+                    action: 'ghost_hint_clicked',
+                    hint_key: 'count_drawn_edges',
+                    label: 'Spočítej mi aktuální počet nakreslených cest.'
+                });
+                clearSuggest('count_hint');
+                clearCheck('count_hint');
+                const container = document.getElementById('connect-container');
+                if (container) container.classList.add('degree-count-mode');
+                countActive = true;
+                showOrange('Vie osoitin linnan päälle. Osoittimen vieressä näkyy, kuinka monta tietä siitä nyt lähtee.');
+                actionLogs.push({
+                    time: Date.now(),
+                    action: taskKey + '_hint_count_activated',
+                    nodes: nodeSnapshot()
+                });
+                closeMenu(ghostBubble, ghostUI);
+            });
+            document.getElementById('hint-suggest').addEventListener('click', () => {
+                actionLogs.push({
+                    time: Date.now(),
+                    action: 'ghost_hint_clicked',
+                    hint_key: 'suggest_castle',
+                    label: 'Poraď mi, u jakého hradu mám teď vytvořit cesty.'
+                });
+                clearCount('suggest_hint');
+                clearCheck('suggest_hint');
+                applySuggest();
+                closeMenu(ghostBubble, ghostUI);
+            });
+            document.getElementById('hint-check').addEventListener('click', () => {
+                actionLogs.push({
+                    time: Date.now(),
+                    action: 'ghost_hint_clicked',
+                    hint_key: 'check_progress',
+                    label: 'Zkontroluj, jestli mám zatím úlohu správně.'
+                });
+                clearCount('check_hint');
+                clearSuggest('check_hint');
+                hideOrange();
+                applyCheck();
+                closeMenu(ghostBubble, ghostUI);
+            });
+            document.getElementById('ghost-hint-close').addEventListener('click', () => {
+                actionLogs.push({ time: Date.now(), action: 'ghost_hint_closed' });
+                closeMenu(ghostBubble, ghostUI);
+            });
+        };
+
+        return {
+            openMenu,
+            isCheckActive: () => checkActive,
+            onGraphEdited: (source) => {
+                clearCheck(source);
+                clearSuggest(source);
+                refreshHover(source);
+            },
+            dismiss: (source) => {
+                clearScale(source);
+                clearCount(source);
+                clearSuggest(source);
+                clearCheck(source);
+                hideOrange();
+                hideTip();
+            }
+        };
+    };
+
+    // ==========================================
+    // ÚLOHA 2: DegreeSequenceTask2 (S přesouváním - Původní graf)
+    // ==========================================
+    const DegreeSequenceTask2 = {
+      type: jsPsychHtmlButtonResponse,
+      choices: [],
+      data: { task_name: 'DegreeSequenceTask2' },
+      stimulus: () => {
+        return `
+          <div id="connect-container">
+            <div id="ghost-ui" style="position: fixed; bottom: 20px; left: 20px; display: flex; align-items: flex-end; z-index: 999; transition: transform 0.5s ease; transform: scale(0.6); transform-origin: bottom left;">
+              <div id="ghost-character" style="text-align: center; animation: float 3s ease-in-out infinite; cursor: pointer;">
+                <div style="font-size: 100px; line-height: 1;">👻</div>
+                <div style="font-weight: bold; background: rgba(255,255,255,0.8); padding: 2px 8px; border-radius: 10px;"></div>
+              </div>
+            <div id="ghost-bubble" class="ghost-bubble">
+              <div id="ghost-text" class="ghost-text">Napsauta aavetta, jos tarvitset vihjeen.</div>
+                <div id="ghost-buttons" style="display: flex; gap: 10px; justify-content: center; flex-direction: column;"></div>
+                <div style="position: absolute; bottom: -15px; left: 30px; width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 15px solid #007bff;"></div>
+                <div style="position: absolute; bottom: -10px; left: 30px; width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 15px solid #fff;"></div>
+              </div>
+            </div>
+
+            <div class="prompt">
+              <h2>Yhdistä linnat viivoilla niin, että jokaisesta linnasta lähtee yhtä monta tietä kuin sen vieressä oleva numero.</h2>
+              <p>Yhdistät kaksi linnaa napsauttamalla niitä. Linnoja voi myös siirtää.</p>
+            </div>
+
+            <div id="hint-box-2" class="task-hint-banner" style="display: none; background: #ffe8cc; color: #8a4b08; border: 2px solid #ff8c00; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+              Kun yhdistät linnoja tiellä, näytän, onko se oikein. Vihreisiin linnoihin johtaa oikea määrä teitä. Punaiset linnat tarvitsevat enemmän tai vähemmän teitä.
+            </div>
+
+            <div id="hint-box-3" class="task-hint-banner" style="display: none; background: #ffe8cc; color: #8a4b08; border: 2px solid #ff8c00; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+              Poistaaksesi tien napsauta uudelleen kahta linnaa, jotka se yhdistää.
+            </div>
+
+            <div id="degree-connect-orange-hint" class="task-hint-banner" style="display: none; background: #ffe8cc; color: #8a4b08; border: 2px solid #ff8c00; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);"></div>
+            <div id="degree-connect-degree-tip" class="degree-connect-degree-tip"></div>
+
+            <div class="degree-plot-column degree-plot-column--centered">
+            <svg id="connect-graph" class="svg-container" viewBox="0 0 480 360" preserveAspectRatio="xMidYMid meet"></svg>
+            </div>
+            <div class="ui">
+              <button id="btn-hide-hint" class="custom-task-btn" style="padding: 10px 15px; border: 2px solid #333; border-radius: 8px; background: #333; color: white; cursor: pointer; font-weight: bold; margin: 5px;">Poista vihje</button>
+              <button id="btn-delete-road" class="custom-task-btn" style="padding: 10px 15px; border: 2px solid #333; border-radius: 8px; background: #333; color: white; cursor: pointer; font-weight: bold; margin: 5px;">Poista tie</button>
+              <button id="btn-restart" class="custom-task-btn" style="padding: 10px 15px; border: 2px solid #333; border-radius: 8px; background: #333; color: white; cursor: pointer; font-weight: bold; margin: 5px;">Aloita alusta</button>
+              <button id="btn-finish" class="custom-task-btn" style="padding: 10px 15px; border: 2px solid #333; border-radius: 8px; background: #333; color: white; cursor: pointer; font-weight: bold; margin: 5px;">Seuraava tehtävä</button>
+            </div>
+          </div>
+        `;
+      },
+      on_load: () => {
+        setDigitoolSelfAssessmentUiLock(false);
+        disposeDigitoolIdleTimer();
+        console.log('DegreeSequenceTask2: on_load started.');
+        const svg = document.getElementById('connect-graph');
+        const svgNS = "http://www.w3.org/2000/svg";
+        
+        const nodes = [
+  	      {id: 1, label: "2", x: 120, y: 60},
+	      {id: 2, label: "4", x: 240, y: 60},
+	      {id: 3, label: "3", x: 360, y: 60},
+	      {id: 4, label: "3", x: 120, y: 180},
+	      {id: 5, label: "3", x: 240, y: 180},
+	      {id: 6, label: "1", x: 360, y: 180},
+	      {id: 7, label: "1", x: 120, y: 300},
+	      {id: 8, label: "1", x: 240, y: 300}
+	    ];
+        
+        // Uložit originální pozice pro restart
+        nodes.forEach(n => {
+            n.originalX = n.x;
+            n.originalY = n.y;
+        });
+        
+        let edges = [];
+        let selectedNode = null;
+        let actionLogs = [];
+        DigitoolActionLogStore.wireArray(respondentIdFromUrl, 'degree', actionLogs, {
+          taskName: 'DegreeSequence2'
+        });
+        actionLogs.push({ action: 'task_loaded', task_name: 'DegreeSequence2' });
+        const detachWindowScrollLoggerDegree2 = attachWindowScrollLogger((action, detail) => {
+            actionLogs.push({ action, ...detail });
+        }, 'DegreeSequenceTask2');
+        
+        let draggedNodeId = null;
+        let hasMoved = false;
+        let startPoint = { x: 0, y: 0 };
+        let feedbackEnabled = false;
+        let deleteMode = false;
+        let degree2SelfAssessmentOpen = false;
+
+        const hideAllHints = () => {
+            document.getElementById('hint-box-2').style.display = 'none';
+            document.getElementById('hint-box-3').style.display = 'none';
+            deleteMode = false;
+        };
+
+        const updateConnectedDegrees = () => {
+            nodes.forEach(n => {
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                const degree = edges.filter(e => e.u === n.id || e.v === n.id).length;
+                const targetDegree = parseInt(n.label, 10);
+                group.classList.remove('correct', 'incorrect');
+                if (feedbackEnabled) {
+                    if (degree === targetDegree) group.classList.add('correct');
+                    else group.classList.add('incorrect');
+                }
+            });
+        };
+        const hideEdgeRequiredHint = () => {
+            const hint = document.getElementById('hint-box-3');
+            if (!hint) return;
+            if (hint.textContent && hint.textContent.includes('Luo tai poista ensin vähintään yksi tie.')) {
+                hint.style.display = 'none';
+            }
+        };
+
+        const drawEdges = () => {
+            svg.querySelectorAll('.edge, .road').forEach(e => e.remove());
+            const nodeById = (id) => nodes.find(n => n.id === id);
+            const edgeEnds = (edge) => [nodeById(edge.u), nodeById(edge.v)];
+            const overlapsOnLine = (edgeA, edgeB) => {
+                const [aU, aV] = edgeEnds(edgeA);
+                const [bU, bV] = edgeEnds(edgeB);
+                if (!aU || !aV || !bU || !bV) return false;
+                const dx = aV.x - aU.x;
+                const dy = aV.y - aU.y;
+                const len = Math.hypot(dx, dy);
+                if (len < 1e-6) return false;
+                const dist = (px, py) => Math.abs(dx * (py - aU.y) - dy * (px - aU.x)) / len;
+                if (dist(bU.x, bU.y) > 14 || dist(bV.x, bV.y) > 14) return false;
+                const ux = dx / len;
+                const uy = dy / len;
+                const proj = (x, y) => ((x - aU.x) * ux) + ((y - aU.y) * uy);
+                const b0 = proj(bU.x, bU.y);
+                const b1 = proj(bV.x, bV.y);
+                const overlap = Math.min(len, Math.max(b0, b1)) - Math.max(0, Math.min(b0, b1));
+                return overlap > 16;
+            };
+            const parent = edges.map((_, i) => i);
+            const find = (x) => {
+                while (parent[x] !== x) {
+                    parent[x] = parent[parent[x]];
+                    x = parent[x];
+                }
+                return x;
+            };
+            for (let i = 0; i < edges.length; i++) {
+                for (let j = i + 1; j < edges.length; j++) {
+                    if (!overlapsOnLine(edges[i], edges[j])) continue;
+                    const pi = find(i);
+                    const pj = find(j);
+                    if (pi !== pj) parent[pi] = pj;
+                }
+            }
+            const groups = new Map();
+            for (let i = 0; i < edges.length; i++) {
+                const root = find(i);
+                if (!groups.has(root)) groups.set(root, []);
+                groups.get(root).push(i);
+            }
+            const curveByEdge = new Array(edges.length).fill(null);
+            groups.forEach((members) => {
+                if (members.length < 2) return;
+                let refDx = 1;
+                let refDy = 0;
+                let refLen = 0;
+                members.forEach((idx) => {
+                    const [u, v] = edgeEnds(edges[idx]);
+                    if (!u || !v) return;
+                    const dx = v.x - u.x;
+                    const dy = v.y - u.y;
+                    const len = Math.hypot(dx, dy);
+                    if (len > refLen) {
+                        refLen = len;
+                        refDx = dx;
+                        refDy = dy;
+                    }
+                });
+                if (refLen < 1e-6) return;
+                if (refDx < 0 || (Math.abs(refDx) < 1e-6 && refDy < 0)) {
+                    refDx = -refDx;
+                    refDy = -refDy;
+                }
+                const refNx = -refDy / refLen;
+                const refNy = refDx / refLen;
+                members.slice().sort((a, b) => a - b).forEach((idx, rank) => {
+                    const side = rank % 2 === 0 ? -1 : 1;
+                    const mag = Math.floor(rank / 2) + 1;
+                    curveByEdge[idx] = { nx: refNx, ny: refNy, lane: side * mag };
+                });
+            });
+            edges.forEach((edge, edgeIndex) => {
+                const nodeU = nodeById(edge.u);
+                const nodeV = nodeById(edge.v);
+                if (!nodeU || !nodeV) return;
+                const len = Math.hypot(nodeV.x - nodeU.x, nodeV.y - nodeU.y) || 1;
+                const curve = curveByEdge[edgeIndex];
+                let control = 0;
+                if (curve) {
+                    const visual = Math.min(Math.abs(curve.lane) * 22, Math.max(14, len * 0.4));
+                    control = visual * 2 * Math.sign(curve.lane);
+                }
+
+                const roadGroup = document.createElementNS(svgNS, 'g');
+                roadGroup.classList.add('road');
+                const asphalt = document.createElementNS(svgNS, control === 0 ? 'line' : 'path');
+                const centerLine = document.createElementNS(svgNS, control === 0 ? 'line' : 'path');
+                if (control === 0) {
+                    asphalt.setAttribute('x1', nodeU.x); asphalt.setAttribute('y1', nodeU.y);
+                    asphalt.setAttribute('x2', nodeV.x); asphalt.setAttribute('y2', nodeV.y);
+                    centerLine.setAttribute('x1', nodeU.x); centerLine.setAttribute('y1', nodeU.y);
+                    centerLine.setAttribute('x2', nodeV.x); centerLine.setAttribute('y2', nodeV.y);
+                } else {
+                    const cx = ((nodeU.x + nodeV.x) / 2) + (curve.nx * control);
+                    const cy = ((nodeU.y + nodeV.y) / 2) + (curve.ny * control);
+                    const d = `M ${nodeU.x} ${nodeU.y} Q ${cx} ${cy} ${nodeV.x} ${nodeV.y}`;
+                    asphalt.setAttribute('d', d);
+                    asphalt.setAttribute('fill', 'none');
+                    centerLine.setAttribute('d', d);
+                    centerLine.setAttribute('fill', 'none');
+                }
+                asphalt.setAttribute('stroke', '#666');
+                asphalt.setAttribute('stroke-width', '14');
+                asphalt.setAttribute('stroke-linecap', 'round');
+                centerLine.setAttribute('stroke', '#fff');
+                centerLine.setAttribute('stroke-width', '2');
+                centerLine.setAttribute('stroke-dasharray', '8,8');
+                centerLine.setAttribute('stroke-linecap', 'round');
+                roadGroup.appendChild(asphalt);
+                roadGroup.appendChild(centerLine);
+                svg.insertBefore(roadGroup, svg.firstChild);
+            });
+        };
+
+        const degree2Hints = createDegreeConnectHints({
+            taskKey: 'degree2',
+            svg,
+            nodes,
+            getEdges: () => edges,
+            actionLogs
+        });
+
+        const handleNodeClick = (clickedId, group) => {
+            if (selectedNode === null) {
+                selectedNode = clickedId;
+                if (!degree2Hints.isCheckActive()) group.classList.remove('correct', 'incorrect');
+                group.classList.add('selected');
+                actionLogs.push({ time: Date.now(), action: 'select_first_node', node: clickedId });
+                if (deleteMode) {
+                    showHintBanner('hint-box-3');
+                    document.getElementById('hint-box-3').textContent = 'Napsauta nyt toista linnaa poistaaksesi tien.';
+                    return;
+                }
+            } else if (selectedNode === clickedId) {
+                selectedNode = null;
+                group.classList.remove('selected');
+                if (feedbackEnabled) {
+                    const degree = edges.filter(e => e.u === clickedId || e.v === clickedId).length;
+                    const targetDegree = parseInt(nodes.find(n => n.id === clickedId).label, 10);
+                    if (degree === targetDegree) group.classList.add('correct');
+                    else group.classList.add('incorrect');
+                }
+                actionLogs.push({ time: Date.now(), action: 'deselect_node', node: clickedId });
+            } else {
+                const existingEdgeIndex = edges.findIndex(e => 
+                    (e.u === selectedNode && e.v === clickedId) || (e.u === clickedId && e.v === selectedNode)
+                );
+                let edited = null;
+
+                if (deleteMode) {
+                    if (existingEdgeIndex !== -1) {
+                        edges.splice(existingEdgeIndex, 1);
+                        hideEdgeRequiredHint();
+                        edited = 'delete_edge';
+                        actionLogs.push({ time: Date.now(), action: 'delete_edge', from: selectedNode, to: clickedId });
+                    } else {
+                        actionLogs.push({ time: Date.now(), action: 'delete_edge_failed_no_edge', from: selectedNode, to: clickedId });
+                    }
+                    deleteMode = false;
+                    document.getElementById('hint-box-3').style.display = 'none';
+                    svg.querySelector(`g[data-id="${selectedNode}"]`).classList.remove('selected');
+                    selectedNode = null;
+                    drawEdges();
+                    if (feedbackEnabled) updateConnectedDegrees();
+                    if (edited) degree2Hints.onGraphEdited(edited);
+                    return;
+                }
+
+                if (existingEdgeIndex !== -1) {
+                    edges.splice(existingEdgeIndex, 1);
+                    hideEdgeRequiredHint();
+                    edited = 'remove_edge';
+                    actionLogs.push({ time: Date.now(), action: 'remove_edge', from: selectedNode, to: clickedId });
+                } else {
+                    edges.push({ u: selectedNode, v: clickedId });
+                    hideEdgeRequiredHint();
+                    edited = 'add_edge';
+                    actionLogs.push({ time: Date.now(), action: 'add_edge', from: selectedNode, to: clickedId });
+                }
+
+                svg.querySelector(`g[data-id="${selectedNode}"]`).classList.remove('selected');
+                selectedNode = null;
+                drawEdges();
+                if (feedbackEnabled) updateConnectedDegrees();
+                degree2Hints.onGraphEdited(edited);
+            }
+        };
+
+        nodes.forEach(node => {
+            const group = document.createElementNS(svgNS, 'g');
+            group.classList.add('node');
+            group.dataset.id = node.id;
+
+            const highlight = document.createElementNS(svgNS, 'circle');
+            highlight.setAttribute('cx', node.x); highlight.setAttribute('cy', node.y);
+            highlight.setAttribute('r', 32);
+            highlight.classList.add('town-highlight');
+
+            const icon = document.createElementNS(svgNS, 'text');
+            icon.setAttribute('x', node.x); icon.setAttribute('y', node.y);
+            icon.textContent = '🏰';
+            icon.classList.add('town-icon');
+
+            const badgeBg = document.createElementNS(svgNS, 'circle');
+            badgeBg.setAttribute('cx', node.x + 18); badgeBg.setAttribute('cy', node.y - 18);
+            badgeBg.setAttribute('r', 12);
+            badgeBg.setAttribute('fill', '#ffffff');
+            badgeBg.setAttribute('stroke', '#333');
+            badgeBg.setAttribute('stroke-width', '2');
+
+            const badgeText = document.createElementNS(svgNS, 'text');
+            badgeText.setAttribute('x', node.x + 18); badgeText.setAttribute('y', node.y - 18);
+            badgeText.textContent = node.label;
+            badgeText.setAttribute('class', 'badge-text');
+            badgeText.setAttribute('font-family', 'sans-serif');
+            badgeText.setAttribute('font-weight', 'bold');
+            badgeText.setAttribute('font-size', '14px');
+            badgeText.setAttribute('text-anchor', 'middle');
+            badgeText.setAttribute('dominant-baseline', 'central');
+
+            group.appendChild(highlight);
+            group.appendChild(icon);
+            group.appendChild(badgeBg);
+            group.appendChild(badgeText);
+            svg.appendChild(group);
+
+            group.addEventListener('pointerdown', (e) => {
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
+                draggedNodeId = node.id;
+                hasMoved = false;
+                startPoint = { x: e.clientX, y: e.clientY };
+                e.preventDefault();
+            }, { passive: false });
+
+            group.addEventListener('click', () => {
+                if (hasMoved) {
+                    hasMoved = false;
+                    return;
+                }
+                handleNodeClick(node.id, group);
+            });
+        });
+
+        svg.addEventListener('pointermove', (e) => {
+            if (draggedNodeId === null) return;
+            const dx = e.clientX - startPoint.x;
+            const dy = e.clientY - startPoint.y;
+
+            if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+                hasMoved = true;
+            }
+
+            if (hasMoved) {
+                const pt = svg.createSVGPoint();
+                pt.x = e.clientX;
+                pt.y = e.clientY;
+                const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+
+                const nodeObj = nodes.find(n => n.id === draggedNodeId);
+                nodeObj.x = svgP.x;
+                nodeObj.y = svgP.y;
+
+                const group = svg.querySelector(`g[data-id="${draggedNodeId}"]`);
+                const highlight = group.querySelector('.town-highlight');
+                const icon = group.querySelector('.town-icon');
+                const badgeBg = group.querySelector('circle:not(.town-highlight)');
+                const badgeText = group.querySelector('.badge-text');
+
+                highlight.setAttribute('cx', nodeObj.x);
+                highlight.setAttribute('cy', nodeObj.y);
+                icon.setAttribute('x', nodeObj.x);
+                icon.setAttribute('y', nodeObj.y);
+                badgeBg.setAttribute('cx', nodeObj.x + 18);
+                badgeBg.setAttribute('cy', nodeObj.y - 18);
+                badgeText.setAttribute('x', nodeObj.x + 18);
+                badgeText.setAttribute('y', nodeObj.y - 18);
+
+                group.querySelector('text').setAttribute('y', nodeObj.y);
+
+                drawEdges();
+            }
+        });
+
+        const endConnectDrag = () => {
+            if (draggedNodeId !== null) {
+                const nodeObj = nodes.find(n => n.id === draggedNodeId);
+
+                if (hasMoved) {
+                    actionLogs.push({ time: Date.now(), action: 'move_node', node: draggedNodeId, new_x: Math.round(nodeObj.x), new_y: Math.round(nodeObj.y) });
+                }
+                draggedNodeId = null;
+            }
+        };
+
+        svg.addEventListener('pointerup', endConnectDrag);
+        svg.addEventListener('pointercancel', endConnectDrag);
+
+        const ghostText = document.getElementById('ghost-text');
+        const ghostButtons = document.getElementById('ghost-buttons');
+        const ghostBubble = document.getElementById('ghost-bubble');
+        const ghostUI = document.getElementById('ghost-ui');
+        const ghostCharacter = document.getElementById('ghost-character');
+
+        ghostCharacter.addEventListener('click', () => {
+            if (degree2SelfAssessmentOpen) return;
+            actionLogs.push({ time: Date.now(), action: 'ghost_clicked_for_hint' });
+            degree2Hints.openMenu({ ghostText, ghostButtons, ghostBubble, ghostUI });
+        });
+        console.log('DegreeSequenceTask2: ghostCharacter click handler finished.');
+
+        // --- PŘIDANÉ EVENT LISTENERS PRO TLAČÍTKA ---
+        document.getElementById('btn-hide-hint').addEventListener('click', () => {
+            hideAllHints();
+            degree2Hints.dismiss('hide_hint');
+            feedbackEnabled = false; // Vypne barvičky
+            nodes.forEach(n => { // Smaže aktuální barvičky
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                group.classList.remove('correct', 'incorrect');
+            });
+            actionLogs.push({ time: Date.now(), action: 'hide_hint' });
+        });
+
+        document.getElementById('btn-delete-road').addEventListener('click', () => {
+            hideAllHints();
+            if (edges.length === 0) {
+            showHintBanner('hint-box-3');
+            document.getElementById('hint-box-3').textContent = 'Luo tai poista ensin vähintään yksi tie.';
+            actionLogs.push({ time: Date.now(), action: 'delete_road_mode_rejected_no_edges' });
+            return;
+            }
+            deleteMode = true;
+            showHintBanner('hint-box-3');
+            document.getElementById('hint-box-3').textContent = 'Poistaaksesi tien napsauta uudelleen kahta linnaa, jotka se yhdistää.';
+            actionLogs.push({ time: Date.now(), action: 'delete_road_mode_activated' });
+        });
+
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            if (edges.length === 0) {
+                showHintBanner('hint-box-3');
+                document.getElementById('hint-box-3').textContent = 'Luo tai poista ensin vähintään yksi tie.';
+                actionLogs.push({ time: Date.now(), action: 'restart_rejected_no_edges' });
+                return;
+            }
+            edges = [];
+            degree2Hints.dismiss('restart_task');
+            nodes.forEach(n => {
+                n.x = n.originalX || n.x; // Reset pozic, pokud máme originální
+                n.y = n.originalY || n.y;
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                group.classList.remove('correct', 'incorrect', 'selected');
+                const highlight = group.querySelector('.town-highlight');
+                const icon = group.querySelector('.town-icon');
+                const badgeBg = group.querySelector('circle:not(.town-highlight)');
+                const badgeText = group.querySelector('.badge-text');
+                highlight.setAttribute('cx', n.x);
+                highlight.setAttribute('cy', n.y);
+                icon.setAttribute('x', n.x);
+                icon.setAttribute('y', n.y);
+                badgeBg.setAttribute('cx', n.x + 18);
+                badgeBg.setAttribute('cy', n.y - 18);
+                badgeText.setAttribute('x', n.x + 18);
+                badgeText.setAttribute('y', n.y - 18);
+            });
+            selectedNode = null;
+            feedbackEnabled = false;
+            drawEdges();
+            hideAllHints();
+            actionLogs.push({ time: Date.now(), action: 'restart_task' });
+        });
+
+        const clearDegree2OutcomeMarks = () => {
+            nodes.forEach((n) => {
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                if (group) group.classList.remove('correct', 'incorrect');
+            });
+        };
+
+        const markDegree2StudentErrors = () => {
+            nodes.forEach((n) => {
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                if (!group) return;
+                const currentDegree = edges.filter((e) => e.u === n.id || e.v === n.id).length;
+                const targetDegree = parseInt(n.label, 10);
+                group.classList.remove('correct', 'incorrect', 'selected');
+                if (currentDegree === targetDegree) group.classList.add('correct');
+                else group.classList.add('incorrect');
+            });
+        };
+
+        const revealDegree2CorrectEdges = () => {
+            const solved = realizeSimpleGraphFromDegreeLabels(nodes);
+            if (!solved) return false;
+            edges = solved;
+            selectedNode = null;
+            drawEdges();
+            nodes.forEach((n) => {
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                if (!group) return;
+                group.classList.remove('incorrect', 'selected');
+                group.classList.add('correct');
+            });
+            return true;
+        };
+
+        const hideDegree2OutcomeGhost = () => {
+            ghostBubble.classList.remove('degree-self-assessment-wide', 'visible');
+            ghostUI.style.transform = 'scale(0.6)';
+            ghostButtons.innerHTML = '';
+        };
+
+        const showDegreeSequence2OutcomeFeedback = async (allCorrect) => {
+            actionLogs.push({ time: Date.now(), action: 'outcome_feedback_shown', all_correct: allCorrect });
+            ghostUI.style.transform = 'scale(1)';
+            ghostButtons.style.flexDirection = 'column';
+            ghostBubble.classList.add('degree-self-assessment-wide', 'visible');
+            if (allCorrect) {
+                ghostText.innerHTML = 'Hienoa, ratkaisu on oikein!';
+                ghostButtons.innerHTML = '<button type="button" id="degree2-feedback-continue" class="ghost-hint-btn">Jatka</button>';
+                return new Promise((resolve) => {
+                    document.getElementById('degree2-feedback-continue').addEventListener('click', () => {
+                        actionLogs.push({ time: Date.now(), action: 'outcome_correct_continue_clicked', all_correct: true });
+                        hideDegree2OutcomeGhost();
+                        resolve('finish');
+                    }, { once: true });
+                });
+            }
+            ghostText.innerHTML = 'Siinä on virhe. Näytän, mitkä kohdat ovat väärin, mutta en paljasta ratkaisua.';
+            ghostButtons.innerHTML = `
+              <button type="button" id="degree2-feedback-retry" class="ghost-hint-btn">Haluan yrittää korjata sen</button>
+              <button type="button" id="degree2-feedback-solution" class="ghost-hint-btn">Näytä minulle oikea ratkaisu</button>
+            `;
+            return new Promise((resolve) => {
+                document.getElementById('degree2-feedback-retry').addEventListener('click', () => {
+                    actionLogs.push({ time: Date.now(), action: 'outcome_incorrect_retry_clicked' });
+                    clearDegree2OutcomeMarks();
+                    actionLogs.push({ time: Date.now(), action: 'outcome_returned_to_solving' });
+                    hideDegree2OutcomeGhost();
+                    ghostText.innerHTML = 'Napsauta aavetta, jos tarvitset vihjeen.';
+                    degree2SelfAssessmentOpen = false;
+                    setDigitoolSelfAssessmentUiLock(false);
+                    resolve('retry');
+                }, { once: true });
+                document.getElementById('degree2-feedback-solution').addEventListener('click', () => {
+                    actionLogs.push({ time: Date.now(), action: 'outcome_incorrect_show_solution_clicked' });
+                    const revealed = revealDegree2CorrectEdges();
+                    actionLogs.push({ time: Date.now(), action: 'degree2_correct_solution_revealed', revealed });
+                    ghostText.innerHTML = 'Oikea ratkaisu näyttää tältä.';
+                    ghostButtons.innerHTML = '<button type="button" id="degree2-feedback-solution-continue" class="ghost-hint-btn">Jatka</button>';
+                    document.getElementById('degree2-feedback-solution-continue').addEventListener('click', () => {
+                        actionLogs.push({ time: Date.now(), action: 'outcome_solution_continue_clicked' });
+                        hideDegree2OutcomeGhost();
+                        resolve('finish');
+                    }, { once: true });
+                }, { once: true });
+            });
+        };
+
+        const finishDegreeSequence2TrialWithAssessment = async (selfAssessmentCode, selfAssessmentLabel) => {
+            // Výpočet finální správnosti všech vrcholů
+            const final_correctness = nodes.map(n => {
+                const currentDegree = edges.filter(e => e.u === n.id || e.v === n.id).length;
+                const targetDegree = parseInt(n.label, 10);
+                return { 
+                    node_id: n.id, 
+                    target_degree: targetDegree, 
+                    actual_degree: currentDegree, 
+                    is_correct: currentDegree === targetDegree 
+                };
+            });
+            const all_correct = final_correctness.every(v => v.is_correct);
+
+            const t = Date.now();
+            actionLogs.push({
+                time: t,
+                action: 'self_assessment_chosen',
+                self_assessment: selfAssessmentCode,
+                self_assessment_label: selfAssessmentLabel
+            });
+            actionLogs.push({ time: t, action: 'finish_task_confirmed' });
+            degree2Hints.dismiss('outcome_feedback');
+            console.log('DegreeSequenceTask2: btn-finish clicked.');
+            ghostBubble.classList.remove('degree-self-assessment-wide', 'visible');
+            ghostUI.style.transform = 'scale(0.6)';
+
+            if (!all_correct) {
+                markDegree2StudentErrors();
+                actionLogs.push({ time: Date.now(), action: 'degree2_post_feedback_student_solution_marked' });
+            }
+
+            const outcomeChoice = await showDegreeSequence2OutcomeFeedback(all_correct);
+            if (outcomeChoice === 'retry') return;
+            degree2SelfAssessmentOpen = false;
+
+            const trialData = {
+                task_name: 'DegreeSequenceTask2',
+                action_logs: actionLogs
+            };
+            console.log('DegreeSequenceTask2: trialData prepared:', trialData);
+            detachWindowScrollLoggerDegree2();
+            jsPsych.finishTrial(trialData);
+        };
+
+        const showDegreeSequence2SelfAssessmentDialog = () => {
+            actionLogs.push({ time: Date.now(), action: 'btn_next_clicked_self_assessment_shown' });
+            degree2SelfAssessmentOpen = true;
+            setDigitoolSelfAssessmentUiLock(true);
+            ghostUI.style.transform = 'scale(1)';
+            ghostText.innerHTML = 'Onko tehtävä mielestäsi oikein?';
+            ghostButtons.style.flexDirection = 'column';
+            ghostButtons.innerHTML = `
+              <button type="button" id="degree2-self-continue" class="ghost-hint-btn">Haluan vielä jatkaa ratkaisemista.</button>
+              <button type="button" id="degree2-self-sure-correct" class="ghost-hint-btn">Tiedän varmasti, että tehtävä on oikein.</button>
+              <button type="button" id="degree2-self-correct" class="ghost-hint-btn">Luulen, että tehtävä on oikein.</button>
+              <button type="button" id="degree2-self-unsure" class="ghost-hint-btn">En ole varma, onko tehtävä oikein.</button>
+              <button type="button" id="degree2-self-error" class="ghost-hint-btn">Luulen, että tehtävässä on virhe, mutta en halua enää jatkaa ratkaisemista.</button>
+            `;
+            ghostBubble.classList.add('degree-self-assessment-wide', 'visible');
+
+            document.getElementById('degree2-self-continue').addEventListener('click', () => {
+                actionLogs.push({
+                    time: Date.now(),
+                    action: 'self_assessment_chosen',
+                    self_assessment: 'continue_solving',
+                    self_assessment_label: 'Chci ještě pokračovat v řešení.'
+                });
+                degree2SelfAssessmentOpen = false;
+                setDigitoolSelfAssessmentUiLock(false);
+                ghostBubble.classList.remove('degree-self-assessment-wide', 'visible');
+                ghostUI.style.transform = 'scale(0.6)';
+                ghostText.innerHTML = 'Napsauta aavetta, jos tarvitset vihjeen.';
+                ghostButtons.innerHTML = '';
+            });
+            document.getElementById('degree2-self-sure-correct').addEventListener('click', () => {
+                finishDegreeSequence2TrialWithAssessment('sure_correct', 'Vím jistě, že mám úlohu správně.');
+            });
+            document.getElementById('degree2-self-correct').addEventListener('click', () => {
+                finishDegreeSequence2TrialWithAssessment('think_correct', 'Myslím si, že mám úlohu správně.');
+            });
+            document.getElementById('degree2-self-unsure').addEventListener('click', () => {
+                finishDegreeSequence2TrialWithAssessment('unsure', 'Nevím jistě, zda mám úlohu správně.');
+            });
+            document.getElementById('degree2-self-error').addEventListener('click', () => {
+                finishDegreeSequence2TrialWithAssessment('think_error', 'Myslím si, že mám v úloze chybu, ale už nechci pokračovat v řešení.');
+            });
+        };
+
+        document.getElementById('btn-finish').addEventListener('click', () => {
+            if (degree2SelfAssessmentOpen) return;
+            showDegreeSequence2SelfAssessmentDialog();
+        });
+
+        setupDigitoolIdleGhostPrompt({
+          logAction: (action, detail = {}) => actionLogs.push({ time: Date.now(), action, ...detail }),
+          isIdleAllowed: () =>
+            !degree2SelfAssessmentOpen &&
+            !document.body.classList.contains('digitool-self-assessment-lock') &&
+            !ghostBubble.classList.contains('degree-self-assessment-wide'),
+          ghostText,
+          ghostButtons,
+          ghostBubble,
+          ghostUI,
+          defaultGhostHtml: 'Napsauta aavetta, jos tarvitset vihjeen.',
+          defaultGhostButtonsHtml: '',
+          onRequestHelp: () => {
+            ghostCharacter.click();
+          }
+        });
+        console.log('DegreeSequenceTask2: on_load finished, btn-finish listener attached.');
+      }
+    };
+
+    // ==========================================
+    // ÚLOHA 3: DegreeSequenceTask3 (Identická s Task 2, jiný graf)
+    // ==========================================
+    const DegreeSequenceTask3 = {
+      type: jsPsychHtmlButtonResponse,
+      choices: [],
+      data: { task_name: 'DegreeSequenceTask3' },
+      stimulus: () => {
+        return `
+          <div id="connect-container">
+            <div id="ghost-ui" style="position: fixed; bottom: 20px; left: 20px; display: flex; align-items: flex-end; z-index: 999; transition: transform 0.5s ease; transform: scale(0.6); transform-origin: bottom left;">
+              <div id="ghost-character" style="text-align: center; animation: float 3s ease-in-out infinite; cursor: pointer;">
+                <div style="font-size: 100px; line-height: 1;">👻</div>
+                <div style="font-weight: bold; background: rgba(255,255,255,0.8); padding: 2px 8px; border-radius: 10px;"></div>
+              </div>
+            <div id="ghost-bubble" class="ghost-bubble">
+              <div id="ghost-text" class="ghost-text">Napsauta aavetta, jos tarvitset vihjeen.</div>
+                <div id="ghost-buttons" style="display: flex; gap: 10px; justify-content: center; flex-direction: column;"></div>
+                <div style="position: absolute; bottom: -15px; left: 30px; width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 15px solid #007bff;"></div>
+                <div style="position: absolute; bottom: -10px; left: 30px; width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 15px solid #fff;"></div>
+              </div>
+            </div>
+
+            <div class="prompt">
+              <h2>Yhdistä linnat viivoilla niin, että jokaisesta linnasta lähtee yhtä monta tietä kuin sen vieressä oleva numero.</h2>
+              <p>Yhdistät kaksi linnaa napsauttamalla niitä. Linnoja voi myös siirtää.</p>
+            </div>
+
+            <div id="hint-box-2" class="task-hint-banner" style="display: none; background: #ffe8cc; color: #8a4b08; border: 2px solid #ff8c00; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+              Kun yhdistät linnoja tiellä, näytän, onko se oikein. Vihreisiin linnoihin johtaa oikea määrä teitä. Punaiset linnat tarvitsevat enemmän tai vähemmän teitä.
+            </div>
+
+            <div id="hint-box-3" class="task-hint-banner" style="display: none; background: #ffe8cc; color: #8a4b08; border: 2px solid #ff8c00; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+              Poistaaksesi tien napsauta uudelleen kahta linnaa, jotka se yhdistää.
+            </div>
+
+            <div id="degree-connect-orange-hint" class="task-hint-banner" style="display: none; background: #ffe8cc; color: #8a4b08; border: 2px solid #ff8c00; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05);"></div>
+            <div id="degree-connect-degree-tip" class="degree-connect-degree-tip"></div>
+
+            <div class="degree-plot-column degree-plot-column--centered">
+            <svg id="connect-graph-3" class="svg-container" viewBox="0 0 480 360" preserveAspectRatio="xMidYMid meet"></svg>
+            </div>
+            <div class="ui">
+              <button id="btn-hide-hint-3" class="custom-task-btn" style="padding: 10px 15px; border: 2px solid #333; border-radius: 8px; background: #333; color: white; cursor: pointer; font-weight: bold; margin: 5px;">Poista vihje</button>
+              <button id="btn-delete-road-3" class="custom-task-btn" style="padding: 10px 15px; border: 2px solid #333; border-radius: 8px; background: #333; color: white; cursor: pointer; font-weight: bold; margin: 5px;">Poista tie</button>
+              <button id="btn-restart-3" class="custom-task-btn" style="padding: 10px 15px; border: 2px solid #333; border-radius: 8px; background: #333; color: white; cursor: pointer; font-weight: bold; margin: 5px;">Aloita alusta</button>
+              <button id="btn-finish-3" class="custom-task-btn" style="padding: 10px 15px; border: 2px solid #333; border-radius: 8px; background: #333; color: white; cursor: pointer; font-weight: bold; margin: 5px;">Lopeta tehtävä</button>
+            </div>
+          </div>
+        `;
+      },
+      on_load: () => {
+        setDigitoolSelfAssessmentUiLock(false);
+        disposeDigitoolIdleTimer();
+        console.log('DegreeSequenceTask3: on_load started.');
+        const svg = document.getElementById('connect-graph-3');
+        const svgNS = "http://www.w3.org/2000/svg";
+        
+        // Ukázkový jiný graf (kosočtverec) - můžeš si upravit
+        const nodes = [
+          {id: 1, label: "3", x: 120, y: 300},
+          {id: 2, label: "5", x: 240, y: 300},
+          {id: 3, label: "2", x: 360, y: 300},
+          {id: 4, label: "2", x: 60, y: 180},
+          {id: 5, label: "6", x: 180, y: 180},
+          {id: 6, label: "5", x: 300, y: 180},
+          {id: 7, label: "2", x: 420, y: 180},
+          {id: 8, label: "2", x: 120, y: 60},
+          {id: 9, label: "4", x: 240, y: 60},
+          {id: 10, label: "1", x: 360, y: 60}
+        ];
+        
+        nodes.forEach(n => { n.originalX = n.x; n.originalY = n.y; });
+        
+        let edges = [];
+        let selectedNode = null;
+        let actionLogs = [];
+        DigitoolActionLogStore.wireArray(respondentIdFromUrl, 'degree', actionLogs, {
+          taskName: 'DegreeSequence3'
+        });
+        actionLogs.push({ action: 'task_loaded', task_name: 'DegreeSequence3' });
+        const detachWindowScrollLoggerDegree3 = attachWindowScrollLogger((action, detail) => {
+            actionLogs.push({ action, ...detail });
+        }, 'DegreeSequenceTask3');
+        let draggedNodeId = null;
+        let hasMoved = false;
+        let startPoint = { x: 0, y: 0 };
+        let feedbackEnabled = false;
+        let deleteMode = false;
+        let degree3SelfAssessmentOpen = false;
+
+        const hideAllHints = () => {
+            document.getElementById('hint-box-2').style.display = 'none';
+            document.getElementById('hint-box-3').style.display = 'none';
+            deleteMode = false;
+        };
+
+        const updateConnectedDegrees = () => {
+            nodes.forEach(n => {
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                const degree = edges.filter(e => e.u === n.id || e.v === n.id).length;
+                const targetDegree = parseInt(n.label, 10);
+                group.classList.remove('correct', 'incorrect');
+                if (feedbackEnabled) {
+                    if (degree === targetDegree) group.classList.add('correct');
+                    else group.classList.add('incorrect');
+                }
+            });
+        };
+        const hideEdgeRequiredHint = () => {
+            const hint = document.getElementById('hint-box-3');
+            if (!hint) return;
+            if (hint.textContent && hint.textContent.includes('Luo tai poista ensin vähintään yksi tie.')) {
+                hint.style.display = 'none';
+            }
+        };
+
+        const drawEdges = () => {
+            svg.querySelectorAll('.edge, .road').forEach(e => e.remove());
+            const nodeById = (id) => nodes.find(n => n.id === id);
+            const edgeEnds = (edge) => [nodeById(edge.u), nodeById(edge.v)];
+            const overlapsOnLine = (edgeA, edgeB) => {
+                const [aU, aV] = edgeEnds(edgeA);
+                const [bU, bV] = edgeEnds(edgeB);
+                if (!aU || !aV || !bU || !bV) return false;
+                const dx = aV.x - aU.x;
+                const dy = aV.y - aU.y;
+                const len = Math.hypot(dx, dy);
+                if (len < 1e-6) return false;
+                const dist = (px, py) => Math.abs(dx * (py - aU.y) - dy * (px - aU.x)) / len;
+                if (dist(bU.x, bU.y) > 14 || dist(bV.x, bV.y) > 14) return false;
+                const ux = dx / len;
+                const uy = dy / len;
+                const proj = (x, y) => ((x - aU.x) * ux) + ((y - aU.y) * uy);
+                const b0 = proj(bU.x, bU.y);
+                const b1 = proj(bV.x, bV.y);
+                const overlap = Math.min(len, Math.max(b0, b1)) - Math.max(0, Math.min(b0, b1));
+                return overlap > 16;
+            };
+            const parent = edges.map((_, i) => i);
+            const find = (x) => {
+                while (parent[x] !== x) {
+                    parent[x] = parent[parent[x]];
+                    x = parent[x];
+                }
+                return x;
+            };
+            for (let i = 0; i < edges.length; i++) {
+                for (let j = i + 1; j < edges.length; j++) {
+                    if (!overlapsOnLine(edges[i], edges[j])) continue;
+                    const pi = find(i);
+                    const pj = find(j);
+                    if (pi !== pj) parent[pi] = pj;
+                }
+            }
+            const groups = new Map();
+            for (let i = 0; i < edges.length; i++) {
+                const root = find(i);
+                if (!groups.has(root)) groups.set(root, []);
+                groups.get(root).push(i);
+            }
+            const curveByEdge = new Array(edges.length).fill(null);
+            groups.forEach((members) => {
+                if (members.length < 2) return;
+                let refDx = 1;
+                let refDy = 0;
+                let refLen = 0;
+                members.forEach((idx) => {
+                    const [u, v] = edgeEnds(edges[idx]);
+                    if (!u || !v) return;
+                    const dx = v.x - u.x;
+                    const dy = v.y - u.y;
+                    const len = Math.hypot(dx, dy);
+                    if (len > refLen) {
+                        refLen = len;
+                        refDx = dx;
+                        refDy = dy;
+                    }
+                });
+                if (refLen < 1e-6) return;
+                if (refDx < 0 || (Math.abs(refDx) < 1e-6 && refDy < 0)) {
+                    refDx = -refDx;
+                    refDy = -refDy;
+                }
+                const refNx = -refDy / refLen;
+                const refNy = refDx / refLen;
+                members.slice().sort((a, b) => a - b).forEach((idx, rank) => {
+                    const side = rank % 2 === 0 ? -1 : 1;
+                    const mag = Math.floor(rank / 2) + 1;
+                    curveByEdge[idx] = { nx: refNx, ny: refNy, lane: side * mag };
+                });
+            });
+            edges.forEach((edge, edgeIndex) => {
+                const nodeU = nodeById(edge.u);
+                const nodeV = nodeById(edge.v);
+                if (!nodeU || !nodeV) return;
+                const len = Math.hypot(nodeV.x - nodeU.x, nodeV.y - nodeU.y) || 1;
+                const curve = curveByEdge[edgeIndex];
+                let control = 0;
+                if (curve) {
+                    const visual = Math.min(Math.abs(curve.lane) * 22, Math.max(14, len * 0.4));
+                    control = visual * 2 * Math.sign(curve.lane);
+                }
+                const roadGroup = document.createElementNS(svgNS, 'g');
+                roadGroup.classList.add('road');
+                const asphalt = document.createElementNS(svgNS, control === 0 ? 'line' : 'path');
+                const centerLine = document.createElementNS(svgNS, control === 0 ? 'line' : 'path');
+                if (control === 0) {
+                    asphalt.setAttribute('x1', nodeU.x); asphalt.setAttribute('y1', nodeU.y);
+                    asphalt.setAttribute('x2', nodeV.x); asphalt.setAttribute('y2', nodeV.y);
+                    centerLine.setAttribute('x1', nodeU.x); centerLine.setAttribute('y1', nodeU.y);
+                    centerLine.setAttribute('x2', nodeV.x); centerLine.setAttribute('y2', nodeV.y);
+                } else {
+                    const cx = ((nodeU.x + nodeV.x) / 2) + (curve.nx * control);
+                    const cy = ((nodeU.y + nodeV.y) / 2) + (curve.ny * control);
+                    const d = `M ${nodeU.x} ${nodeU.y} Q ${cx} ${cy} ${nodeV.x} ${nodeV.y}`;
+                    asphalt.setAttribute('d', d);
+                    asphalt.setAttribute('fill', 'none');
+                    centerLine.setAttribute('d', d);
+                    centerLine.setAttribute('fill', 'none');
+                }
+                asphalt.setAttribute('stroke', '#666');
+                asphalt.setAttribute('stroke-width', '14');
+                asphalt.setAttribute('stroke-linecap', 'round');
+                centerLine.setAttribute('stroke', '#fff');
+                centerLine.setAttribute('stroke-width', '2');
+                centerLine.setAttribute('stroke-dasharray', '8,8');
+                centerLine.setAttribute('stroke-linecap', 'round');
+                roadGroup.appendChild(asphalt);
+                roadGroup.appendChild(centerLine);
+                svg.insertBefore(roadGroup, svg.firstChild);
+            });
+        };
+
+        const degree3Hints = createDegreeConnectHints({
+            taskKey: 'degree3',
+            svg,
+            nodes,
+            getEdges: () => edges,
+            actionLogs
+        });
+
+        const handleNodeClick = (clickedId, group) => {
+            if (selectedNode === null) {
+                selectedNode = clickedId;
+                if (!degree3Hints.isCheckActive()) group.classList.remove('correct', 'incorrect');
+                group.classList.add('selected');
+                actionLogs.push({ time: Date.now(), action: 'select_first_node', node: clickedId });
+            } else if (selectedNode === clickedId) {
+                selectedNode = null;
+                group.classList.remove('selected');
+                if (feedbackEnabled) updateConnectedDegrees();
+                actionLogs.push({ time: Date.now(), action: 'deselect_node', node: clickedId });
+            } else {
+                const existingEdgeIndex = edges.findIndex(e => (e.u === selectedNode && e.v === clickedId) || (e.u === clickedId && e.v === selectedNode));
+                let edited = null;
+                const fromId = selectedNode;
+                if (deleteMode) {
+                    if (existingEdgeIndex !== -1) {
+                        edges.splice(existingEdgeIndex, 1);
+                        hideEdgeRequiredHint();
+                        edited = 'delete_edge';
+                        actionLogs.push({ time: Date.now(), action: 'delete_edge', from: fromId, to: clickedId });
+                    } else {
+                        actionLogs.push({ time: Date.now(), action: 'delete_edge_failed_no_edge', from: fromId, to: clickedId });
+                    }
+                    deleteMode = false;
+                    document.getElementById('hint-box-3').style.display = 'none';
+                } else if (existingEdgeIndex !== -1) {
+                    edges.splice(existingEdgeIndex, 1);
+                    hideEdgeRequiredHint();
+                    edited = 'remove_edge';
+                    actionLogs.push({ time: Date.now(), action: 'remove_edge', from: fromId, to: clickedId });
+                } else {
+                    edges.push({ u: selectedNode, v: clickedId });
+                    hideEdgeRequiredHint();
+                    edited = 'add_edge';
+                    actionLogs.push({ time: Date.now(), action: 'add_edge', from: fromId, to: clickedId });
+                }
+                svg.querySelector(`g[data-id="${selectedNode}"]`).classList.remove('selected');
+                selectedNode = null;
+                drawEdges();
+                if (feedbackEnabled) updateConnectedDegrees();
+                if (edited) degree3Hints.onGraphEdited(edited);
+            }
+        };
+
+        nodes.forEach(node => {
+            const group = document.createElementNS(svgNS, 'g');
+            group.classList.add('node');
+            group.dataset.id = node.id;
+            const highlight = document.createElementNS(svgNS, 'circle');
+            highlight.setAttribute('cx', node.x); highlight.setAttribute('cy', node.y); highlight.setAttribute('r', 32); highlight.classList.add('town-highlight');
+            const icon = document.createElementNS(svgNS, 'text');
+            icon.setAttribute('x', node.x); icon.setAttribute('y', node.y); icon.textContent = '🏰'; icon.classList.add('town-icon');
+            const badgeBg = document.createElementNS(svgNS, 'circle');
+            badgeBg.setAttribute('cx', node.x + 18); badgeBg.setAttribute('cy', node.y - 18); badgeBg.setAttribute('r', 12); badgeBg.setAttribute('fill', '#ffffff'); badgeBg.setAttribute('stroke', '#333'); badgeBg.setAttribute('stroke-width', '2');
+            const badgeText = document.createElementNS(svgNS, 'text');
+            badgeText.setAttribute('x', node.x + 18); badgeText.setAttribute('y', node.y - 18); badgeText.textContent = node.label; badgeText.setAttribute('class', 'badge-text'); badgeText.setAttribute('text-anchor', 'middle'); badgeText.setAttribute('dominant-baseline', 'central');
+            group.appendChild(highlight); group.appendChild(icon); group.appendChild(badgeBg); group.appendChild(badgeText);
+            svg.appendChild(group);
+            group.addEventListener('pointerdown', (e) => {
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
+                draggedNodeId = node.id;
+                hasMoved = false;
+                startPoint = { x: e.clientX, y: e.clientY };
+                e.preventDefault();
+            }, { passive: false });
+            group.addEventListener('click', () => { if (hasMoved) { hasMoved = false; return; } handleNodeClick(node.id, group); });
+        });
+
+        svg.addEventListener('pointermove', (e) => {
+            if (draggedNodeId === null) return;
+            if (Math.abs(e.clientX - startPoint.x) > 3 || Math.abs(e.clientY - startPoint.y) > 3) hasMoved = true;
+            if (hasMoved) {
+                const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+                const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+                const nodeObj = nodes.find(n => n.id === draggedNodeId);
+                nodeObj.x = svgP.x; nodeObj.y = svgP.y;
+                const group = svg.querySelector(`g[data-id="${draggedNodeId}"]`);
+                group.querySelector('.town-highlight').setAttribute('cx', nodeObj.x); group.querySelector('.town-highlight').setAttribute('cy', nodeObj.y);
+                group.querySelector('.town-icon').setAttribute('x', nodeObj.x); group.querySelector('.town-icon').setAttribute('y', nodeObj.y);
+                group.querySelector('circle:not(.town-highlight)').setAttribute('cx', nodeObj.x + 18); group.querySelector('circle:not(.town-highlight)').setAttribute('cy', nodeObj.y - 18);
+                group.querySelector('.badge-text').setAttribute('x', nodeObj.x + 18); group.querySelector('.badge-text').setAttribute('y', nodeObj.y - 18);
+                drawEdges();
+            }
+        });
+
+        const endConnectDrag3 = () => {
+            if (draggedNodeId !== null && hasMoved) {
+                actionLogs.push({ time: Date.now(), action: 'move_node', node: draggedNodeId, new_x: Math.round(nodes.find(n => n.id === draggedNodeId).x), new_y: Math.round(nodes.find(n => n.id === draggedNodeId).y) });
+            }
+            draggedNodeId = null;
+        };
+
+        svg.addEventListener('pointerup', endConnectDrag3);
+        svg.addEventListener('pointercancel', endConnectDrag3);
+
+        const ghostText = document.getElementById('ghost-text');
+        const ghostButtons = document.getElementById('ghost-buttons');
+        const ghostBubble = document.getElementById('ghost-bubble');
+        const ghostUI = document.getElementById('ghost-ui');
+        const ghostCharacter = document.getElementById('ghost-character');
+
+        ghostCharacter.addEventListener('click', () => {
+            if (degree3SelfAssessmentOpen) return;
+            actionLogs.push({ time: Date.now(), action: 'ghost_clicked_for_hint' });
+            degree3Hints.openMenu({ ghostText, ghostButtons, ghostBubble, ghostUI });
+        });
+
+        document.getElementById('btn-hide-hint-3').addEventListener('click', () => {
+            hideAllHints();
+            degree3Hints.dismiss('hide_hint');
+            feedbackEnabled = false;
+            updateConnectedDegrees();
+            actionLogs.push({ time: Date.now(), action: 'hide_hint' });
+        });
+        document.getElementById('btn-delete-road-3').addEventListener('click', () => {
+            hideAllHints();
+            if (edges.length === 0) {
+                showHintBanner('hint-box-3');
+                document.getElementById('hint-box-3').textContent = 'Luo tai poista ensin vähintään yksi tie.';
+                actionLogs.push({ time: Date.now(), action: 'delete_road_mode_rejected_no_edges' });
+                return;
+            }
+            deleteMode = true;
+            showHintBanner('hint-box-3');
+            document.getElementById('hint-box-3').textContent = 'Poistaaksesi tien napsauta uudelleen kahta linnaa, jotka se yhdistää.';
+            actionLogs.push({ time: Date.now(), action: 'delete_road_mode_activated' });
+        });
+        document.getElementById('btn-restart-3').addEventListener('click', () => {
+            if (edges.length === 0) {
+                showHintBanner('hint-box-3');
+                document.getElementById('hint-box-3').textContent = 'Luo tai poista ensin vähintään yksi tie.';
+                actionLogs.push({ time: Date.now(), action: 'restart_rejected_no_edges' });
+                return;
+            }
+            edges = [];
+            degree3Hints.dismiss('restart_task');
+            nodes.forEach(n => { n.x = n.originalX; n.y = n.originalY; });
+            drawEdges();
+            updateConnectedDegrees();
+            hideAllHints();
+            feedbackEnabled = false;
+            actionLogs.push({ time: Date.now(), action: 'restart_task' });
+        });
+        const clearDegree3OutcomeMarks = () => {
+            nodes.forEach((n) => {
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                if (group) group.classList.remove('correct', 'incorrect');
+            });
+        };
+
+        const markDegree3StudentErrors = () => {
+            nodes.forEach((n) => {
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                if (!group) return;
+                const currentDegree = edges.filter((e) => e.u === n.id || e.v === n.id).length;
+                const targetDegree = parseInt(n.label, 10);
+                group.classList.remove('correct', 'incorrect', 'selected');
+                if (currentDegree === targetDegree) group.classList.add('correct');
+                else group.classList.add('incorrect');
+            });
+        };
+
+        const revealDegree3CorrectEdges = () => {
+            const solved = realizeSimpleGraphFromDegreeLabels(nodes);
+            if (!solved) return false;
+            edges = solved;
+            selectedNode = null;
+            drawEdges();
+            nodes.forEach((n) => {
+                const group = svg.querySelector(`g[data-id="${n.id}"]`);
+                if (!group) return;
+                group.classList.remove('incorrect', 'selected');
+                group.classList.add('correct');
+            });
+            return true;
+        };
+
+        const hideDegree3OutcomeGhost = () => {
+            ghostBubble.classList.remove('degree-self-assessment-wide', 'visible');
+            ghostUI.style.transform = 'scale(0.6)';
+            ghostButtons.innerHTML = '';
+        };
+
+        const showDegreeSequence3OutcomeFeedback = async (allCorrect) => {
+            actionLogs.push({ time: Date.now(), action: 'outcome_feedback_shown', all_correct: allCorrect });
+            ghostUI.style.transform = 'scale(1)';
+            ghostButtons.style.flexDirection = 'column';
+            ghostBubble.classList.add('degree-self-assessment-wide', 'visible');
+            if (allCorrect) {
+                ghostText.innerHTML = 'Hienoa, ratkaisu on oikein!';
+                ghostButtons.innerHTML = '<button type="button" id="degree3-feedback-continue" class="ghost-hint-btn">Jatka</button>';
+                return new Promise((resolve) => {
+                    document.getElementById('degree3-feedback-continue').addEventListener('click', () => {
+                        actionLogs.push({ time: Date.now(), action: 'outcome_correct_continue_clicked', all_correct: true });
+                        hideDegree3OutcomeGhost();
+                        resolve('finish');
+                    }, { once: true });
+                });
+            }
+            ghostText.innerHTML = 'Siinä on virhe. Näytän, mitkä kohdat ovat väärin, mutta en paljasta ratkaisua.';
+            ghostButtons.innerHTML = `
+              <button type="button" id="degree3-feedback-retry" class="ghost-hint-btn">Haluan yrittää korjata sen</button>
+              <button type="button" id="degree3-feedback-solution" class="ghost-hint-btn">Näytä minulle oikea ratkaisu</button>
+            `;
+            return new Promise((resolve) => {
+                document.getElementById('degree3-feedback-retry').addEventListener('click', () => {
+                    actionLogs.push({ time: Date.now(), action: 'outcome_incorrect_retry_clicked' });
+                    clearDegree3OutcomeMarks();
+                    actionLogs.push({ time: Date.now(), action: 'outcome_returned_to_solving' });
+                    hideDegree3OutcomeGhost();
+                    ghostText.innerHTML = 'Napsauta aavetta, jos tarvitset vihjeen.';
+                    degree3SelfAssessmentOpen = false;
+                    setDigitoolSelfAssessmentUiLock(false);
+                    resolve('retry');
+                }, { once: true });
+                document.getElementById('degree3-feedback-solution').addEventListener('click', () => {
+                    actionLogs.push({ time: Date.now(), action: 'outcome_incorrect_show_solution_clicked' });
+                    const revealed = revealDegree3CorrectEdges();
+                    actionLogs.push({ time: Date.now(), action: 'degree3_correct_solution_revealed', revealed });
+                    ghostText.innerHTML = 'Oikea ratkaisu näyttää tältä.';
+                    ghostButtons.innerHTML = '<button type="button" id="degree3-feedback-solution-continue" class="ghost-hint-btn">Jatka</button>';
+                    document.getElementById('degree3-feedback-solution-continue').addEventListener('click', () => {
+                        actionLogs.push({ time: Date.now(), action: 'outcome_solution_continue_clicked' });
+                        hideDegree3OutcomeGhost();
+                        resolve('finish');
+                    }, { once: true });
+                }, { once: true });
+            });
+        };
+
+        const finishDegreeSequence3TrialWithAssessment = async (selfAssessmentCode, selfAssessmentLabel) => {
+            const final_correctness = nodes.map(n => { const d = edges.filter(e => e.u === n.id || e.v === n.id).length; const t = parseInt(n.label, 10); return { node_id: n.id, target_degree: t, actual_degree: d, is_correct: d === t }; });
+            const t = Date.now();
+            actionLogs.push({
+                time: t,
+                action: 'self_assessment_chosen',
+                self_assessment: selfAssessmentCode,
+                self_assessment_label: selfAssessmentLabel
+            });
+            actionLogs.push({ time: t, action: 'finish_task_confirmed' });
+            degree3Hints.dismiss('outcome_feedback');
+            const allCorrect = final_correctness.every(v => v.is_correct);
+            ghostBubble.classList.remove('degree-self-assessment-wide', 'visible');
+            ghostUI.style.transform = 'scale(0.6)';
+
+            if (!allCorrect) {
+                markDegree3StudentErrors();
+                actionLogs.push({ time: Date.now(), action: 'degree3_post_feedback_student_solution_marked' });
+            }
+
+            const outcomeChoice = await showDegreeSequence3OutcomeFeedback(allCorrect);
+            if (outcomeChoice === 'retry') return;
+            degree3SelfAssessmentOpen = false;
+            detachWindowScrollLoggerDegree3();
+            jsPsych.finishTrial({
+                task_name: 'DegreeSequenceTask3',
+                action_logs: actionLogs
+            });
+        };
+
+        const showDegreeSequence3SelfAssessmentDialog = () => {
+            actionLogs.push({ time: Date.now(), action: 'btn_next_clicked_self_assessment_shown' });
+            degree3SelfAssessmentOpen = true;
+            setDigitoolSelfAssessmentUiLock(true);
+            ghostUI.style.transform = 'scale(1)';
+            ghostText.innerHTML = 'Onko tehtävä mielestäsi oikein?';
+            ghostButtons.style.flexDirection = 'column';
+            ghostButtons.innerHTML = `
+              <button type="button" id="degree3-self-continue" class="ghost-hint-btn">Haluan vielä jatkaa ratkaisemista.</button>
+              <button type="button" id="degree3-self-sure-correct" class="ghost-hint-btn">Tiedän varmasti, että tehtävä on oikein.</button>
+              <button type="button" id="degree3-self-correct" class="ghost-hint-btn">Luulen, että tehtävä on oikein.</button>
+              <button type="button" id="degree3-self-unsure" class="ghost-hint-btn">En ole varma, onko tehtävä oikein.</button>
+              <button type="button" id="degree3-self-error" class="ghost-hint-btn">Luulen, että tehtävässä on virhe, mutta en halua enää jatkaa ratkaisemista.</button>
+            `;
+            ghostBubble.classList.add('degree-self-assessment-wide', 'visible');
+            document.getElementById('degree3-self-continue').addEventListener('click', () => {
+                actionLogs.push({
+                    time: Date.now(),
+                    action: 'self_assessment_chosen',
+                    self_assessment: 'continue_solving',
+                    self_assessment_label: 'Chci ještě pokračovat v řešení.'
+                });
+                degree3SelfAssessmentOpen = false;
+                setDigitoolSelfAssessmentUiLock(false);
+                ghostBubble.classList.remove('degree-self-assessment-wide', 'visible');
+                ghostUI.style.transform = 'scale(0.6)';
+                ghostText.innerHTML = 'Napsauta aavetta, jos tarvitset vihjeen.';
+                ghostButtons.innerHTML = '';
+            });
+            document.getElementById('degree3-self-sure-correct').addEventListener('click', () => {
+                finishDegreeSequence3TrialWithAssessment('sure_correct', 'Vím jistě, že mám úlohu správně.');
+            });
+            document.getElementById('degree3-self-correct').addEventListener('click', () => {
+                finishDegreeSequence3TrialWithAssessment('think_correct', 'Myslím si, že mám úlohu správně.');
+            });
+            document.getElementById('degree3-self-unsure').addEventListener('click', () => {
+                finishDegreeSequence3TrialWithAssessment('unsure', 'Nevím jistě, zda mám úlohu správně.');
+            });
+            document.getElementById('degree3-self-error').addEventListener('click', () => {
+                finishDegreeSequence3TrialWithAssessment('think_error', 'Myslím si, že mám v úloze chybu, ale už nechci pokračovat v řešení.');
+            });
+        };
+
+        document.getElementById('btn-finish-3').addEventListener('click', () => {
+            if (degree3SelfAssessmentOpen) return;
+            showDegreeSequence3SelfAssessmentDialog();
+        });
+
+        setupDigitoolIdleGhostPrompt({
+          logAction: (action, detail = {}) => actionLogs.push({ time: Date.now(), action, ...detail }),
+          isIdleAllowed: () =>
+            !degree3SelfAssessmentOpen &&
+            !document.body.classList.contains('digitool-self-assessment-lock') &&
+            !ghostBubble.classList.contains('degree-self-assessment-wide'),
+          ghostText,
+          ghostButtons,
+          ghostBubble,
+          ghostUI,
+          defaultGhostHtml: 'Napsauta aavetta, jos tarvitset vihjeen.',
+          defaultGhostButtonsHtml: '',
+          onRequestHelp: () => {
+            ghostCharacter.click();
+          }
+        });
+      }
+    };
+
+    // ==========================================
+    // STARTING THE EXPERIMENT
+    // ==========================================
+    jsPsych.run(
+      DigitoolActionLogStore.bindTrialOnFinish(
+        [DegreeSequence1, DegreeSequenceTask2, DegreeSequenceTask3],
+        respondentIdFromUrl,
+        'degree'
+      )
+    );
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1f2a44" />
+  <meta name="application-name" content="DigiTool" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <title>DigiTool</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: #f4f4f9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    .wrap {
+      width: min(980px, 100%);
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      padding: 24px;
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      text-align: center;
+      font-size: 30px;
+      color: #1f2a44;
+    }
+    .respondent-id {
+      text-align: center;
+      color: #4b5563;
+      font-weight: 700;
+      margin: 0 0 18px 0;
+    }
+    .subtitle {
+      margin: 0 0 24px 0;
+      text-align: center;
+      color: #555;
+      font-size: 16px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(220px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      border: 2px solid #d7d7d7;
+      border-radius: 12px;
+      padding: 14px;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .preview {
+      aspect-ratio: 1 / 1;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #ccc;
+    }
+    .label {
+      text-align: center;
+      font-weight: 700;
+      color: #1f2a44;
+      font-size: 18px;
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .open-btn {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 15px;
+    }
+    .open-euler { background: #2f6ea7; }
+    .open-euler:hover { background: #255c8c; }
+    .open-degree { background: #2b7a4b; }
+    .open-degree:hover { background: #22653e; }
+    .open-park { background: #15803d; }
+    .open-park:hover { background: #126b33; }
+    .card.locked {
+      filter: grayscale(1);
+      opacity: 0.7;
+      border-color: #b0b0b0;
+    }
+    .card.locked .open-btn {
+      background: #8f8f8f !important;
+      cursor: not-allowed;
+    }
+
+    #intro-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      z-index: 2000;
+      display: none;
+    }
+    #ghost-ui {
+      position: fixed;
+      left: 20px;
+      bottom: 20px;
+      z-index: 2200;
+      display: flex;
+      align-items: flex-end;
+      transform-origin: bottom left;
+      transform: scale(0.6);
+      transition: transform 0.35s ease;
+    }
+    #ghost-character {
+      text-align: center;
+      animation: float 3s ease-in-out infinite;
+      cursor: pointer;
+      user-select: none;
+    }
+    #ghost-bubble {
+      margin-left: -10px;
+      margin-bottom: 40px;
+      position: relative;
+      background: #fff;
+      border: 3px solid #007bff;
+      border-radius: 20px;
+      padding: 18px;
+      min-width: 320px;
+      max-width: min(420px, 90vw);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    #ghost-bubble.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .ghost-text {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1f2a44;
+      margin-bottom: 12px;
+      text-align: center;
+      line-height: 1.35;
+    }
+    #ghost-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .ghost-btn {
+      margin-top: 4px;
+      padding: 10px 15px;
+      font-size: 14px;
+      border-radius: 8px;
+      border: none;
+      background: #007bff;
+      color: #fff;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .ghost-btn:hover { background: #0056d2; }
+    .ghost-btn.ghost-btn--back {
+      background: #6c757d;
+    }
+    .ghost-btn.ghost-btn--back:hover {
+      background: #5a6268;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+    @media (max-width: 1100px) {
+      .grid { grid-template-columns: repeat(2, minmax(260px, 1fr)); }
+    }
+    @media (max-width: 760px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .thanks-screen {
+      text-align: center;
+      padding: 30px 10px 20px;
+    }
+    .thanks-screen h2 {
+      margin: 0 0 10px 0;
+      color: #1f2a44;
+      font-size: 34px;
+    }
+    .thanks-screen p {
+      margin: 0;
+      color: #4b5563;
+      font-size: 18px;
+      line-height: 1.5;
+    }
+    .local-export-btn {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 1px;
+      height: 1px;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
+    }
+    #local-export-notice {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3000;
+      max-width: min(520px, calc(100% - 32px));
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: #1f2a44;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      text-align: center;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    #local-export-notice.visible {
+      opacity: 1;
+    }
+    #main-title,
+    .thanks-screen h2 {
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+    .local-export-hold-hint {
+      display: none;
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3000;
+      max-width: min(520px, calc(100% - 32px));
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: #1f2a44;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      text-align: center;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      pointer-events: none;
+    }
+    .local-export-hold-hint.visible {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="main-wrap" class="wrap">
+    <h1 id="main-title">Valitse, mistä tehtävästä aloitat.</h1>
+    <p id="respondent-id" class="respondent-id"></p>
+    <div class="grid">
+      <div class="card">
+        <div class="preview">
+          <svg viewBox="0 0 480 360" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="background:#3d7fb3;">
+            <g stroke="#ffffff" stroke-width="4" stroke-linecap="round">
+              <line x1="100" y1="260" x2="300" y2="260"></line>
+              <line x1="100" y1="260" x2="100" y2="140"></line>
+              <line x1="100" y1="260" x2="300" y2="140"></line>
+              <line x1="300" y1="260" x2="100" y2="140"></line>
+              <line x1="300" y1="260" x2="300" y2="140"></line>
+              <line x1="100" y1="140" x2="300" y2="140"></line>
+              <line x1="100" y1="140" x2="200" y2="50"></line>
+              <line x1="300" y1="140" x2="200" y2="50"></line>
+            </g>
+            <g fill="#ffd54f" stroke="#b8860b" stroke-width="2">
+              <polygon points="100,238 107,252 122,253 111,264 114,280 100,272 86,280 89,264 78,253 93,252"></polygon>
+              <polygon points="300,238 307,252 322,253 311,264 314,280 300,272 286,280 289,264 278,253 293,252"></polygon>
+              <polygon points="100,118 107,132 122,133 111,144 114,160 100,152 86,160 89,144 78,133 93,132"></polygon>
+              <polygon points="300,118 307,132 322,133 311,144 314,160 300,152 286,160 289,144 278,133 293,132"></polygon>
+              <polygon points="200,28 207,42 222,43 211,54 214,70 200,62 186,70 189,54 178,43 193,42"></polygon>
+            </g>
+          </svg>
+        </div>
+        <div class="label">Kuvien piirtäminen yhdellä vedolla</div>
+        <button id="open-euler" class="open-btn open-euler" type="button">Avaa</button>
+      </div>
+
+      <div class="card">
+        <div class="preview">
+          <svg viewBox="0 0 480 360" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="background:#e6f2eb;">
+            <g stroke="#666" stroke-width="10" stroke-linecap="round">
+              <line x1="160" y1="60" x2="320" y2="60"></line>
+              <line x1="160" y1="60" x2="80" y2="160"></line>
+              <line x1="160" y1="60" x2="240" y2="160"></line>
+              <line x1="160" y1="60" x2="210" y2="260"></line>
+              <line x1="320" y1="60" x2="240" y2="160"></line>
+              <line x1="320" y1="60" x2="380" y2="135"></line>
+              <line x1="80" y1="160" x2="240" y2="160"></line>
+              <line x1="80" y1="160" x2="210" y2="260"></line>
+              <line x1="240" y1="160" x2="380" y2="135"></line>
+              <line x1="240" y1="160" x2="210" y2="260"></line>
+              <line x1="380" y1="135" x2="210" y2="260"></line>
+            </g>
+            <g fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="7,7" stroke-linecap="round">
+              <line x1="160" y1="60" x2="320" y2="60"></line>
+              <line x1="160" y1="60" x2="80" y2="160"></line>
+              <line x1="160" y1="60" x2="240" y2="160"></line>
+              <line x1="160" y1="60" x2="210" y2="260"></line>
+              <line x1="320" y1="60" x2="240" y2="160"></line>
+              <line x1="320" y1="60" x2="380" y2="135"></line>
+              <line x1="80" y1="160" x2="240" y2="160"></line>
+              <line x1="80" y1="160" x2="210" y2="260"></line>
+              <line x1="240" y1="160" x2="380" y2="135"></line>
+              <line x1="240" y1="160" x2="210" y2="260"></line>
+              <line x1="380" y1="135" x2="210" y2="260"></line>
+            </g>
+            <g font-size="32" text-anchor="middle" dominant-baseline="central">
+              <text x="160" y="60">🏰</text>
+              <text x="320" y="60">🏰</text>
+              <text x="80" y="160">🏰</text>
+              <text x="240" y="160">🏰</text>
+              <text x="380" y="135">🏰</text>
+              <text x="210" y="260">🏰</text>
+            </g>
+          </svg>
+        </div>
+        <div class="label">Linnojen yhdistäminen teillä</div>
+        <button id="open-degree" class="open-btn open-degree" type="button">Avaa</button>
+      </div>
+
+      <div class="card">
+        <div class="preview">
+          <!-- Stejná mapa jako v 3_ParkTask.html (viewBox 1200×650, PARK_MAP_EDGES_DATA + PARK_MAP_NODES_META) -->
+          <svg viewBox="0 0 1200 650" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="background:#e6f2eb;">
+            <g stroke-linecap="round">
+              <line x1="335" y1="95" x2="600" y2="95" stroke="#f2cf3f" stroke-width="26"/>
+              <line x1="600" y1="95" x2="750" y2="250" stroke="#d50000" stroke-width="26"/>
+              <line x1="750" y1="250" x2="865" y2="95" stroke="#d50000" stroke-width="26"/>
+              <line x1="865" y1="95" x2="960" y2="270" stroke="#0066e6" stroke-width="26"/>
+              <line x1="600" y1="95" x2="865" y2="95" stroke="#d50000" stroke-width="26"/>
+              <line x1="240" y1="270" x2="335" y2="95" stroke="#0066e6" stroke-width="26"/>
+              <line x1="240" y1="270" x2="450" y2="250" stroke="#008a00" stroke-width="26"/>
+              <line x1="240" y1="270" x2="335" y2="470" stroke="#d50000" stroke-width="26"/>
+              <line x1="450" y1="250" x2="600" y2="95" stroke="#d50000" stroke-width="26"/>
+              <line x1="450" y1="250" x2="335" y2="95" stroke="#0066e6" stroke-width="26"/>
+              <line x1="450" y1="250" x2="750" y2="250" stroke="#0066e6" stroke-width="26"/>
+              <line x1="450" y1="250" x2="335" y2="470" stroke="#f2cf3f" stroke-width="26"/>
+              <line x1="450" y1="250" x2="600" y2="410" stroke="#f2cf3f" stroke-width="26"/>
+              <line x1="750" y1="250" x2="600" y2="95" stroke="#008a00" stroke-width="26"/>
+              <line x1="750" y1="250" x2="865" y2="95" stroke="#008a00" stroke-width="26"/>
+              <line x1="750" y1="250" x2="960" y2="270" stroke="#d50000" stroke-width="26"/>
+              <line x1="750" y1="250" x2="600" y2="410" stroke="#0066e6" stroke-width="26"/>
+              <line x1="750" y1="250" x2="865" y2="470" stroke="#d50000" stroke-width="26"/>
+              <line x1="335" y1="470" x2="600" y2="410" stroke="#d50000" stroke-width="26"/>
+              <line x1="335" y1="470" x2="500" y2="585" stroke="#008a00" stroke-width="26"/>
+              <line x1="500" y1="585" x2="600" y2="410" stroke="#f2cf3f" stroke-width="26"/>
+              <line x1="500" y1="585" x2="700" y2="585" stroke="#008a00" stroke-width="26"/>
+              <line x1="600" y1="410" x2="700" y2="585" stroke="#008a00" stroke-width="26"/>
+              <line x1="600" y1="410" x2="865" y2="470" stroke="#d50000" stroke-width="26"/>
+              <line x1="700" y1="585" x2="865" y2="470" stroke="#f2cf3f" stroke-width="26"/>
+              <line x1="865" y1="470" x2="960" y2="270" stroke="#0066e6" stroke-width="26"/>
+            </g>
+            <g font-family="Arial, Helvetica, sans-serif">
+              <g>
+                <circle cx="335" cy="95" r="48" fill="#d9d9d9" stroke="#222" stroke-width="2"/>
+                <text x="335" y="95" font-size="55" text-anchor="middle" dominant-baseline="middle">🍊</text>
+                <text x="377" y="95" text-anchor="end" dominant-baseline="middle" font-size="44" font-weight="900">P</text>
+              </g>
+              <g>
+                <circle cx="600" cy="95" r="48" fill="#d9d9d9" stroke="#222" stroke-width="2"/>
+                <text x="600" y="95" font-size="55" text-anchor="middle" dominant-baseline="middle">🍌</text>
+                <text x="642" y="95" text-anchor="end" dominant-baseline="middle" font-size="44" font-weight="900">B</text>
+              </g>
+              <g>
+                <circle cx="865" cy="95" r="48" fill="#d9d9d9" stroke="#222" stroke-width="2"/>
+                <text x="865" y="95" font-size="55" text-anchor="middle" dominant-baseline="middle" transform="translate(865 95) scale(-1 1) translate(-865 -95)">🍇</text>
+                <text x="907" y="95" text-anchor="end" dominant-baseline="middle" font-size="44" font-weight="900">H</text>
+              </g>
+              <g>
+                <circle cx="240" cy="270" r="48" fill="#d9d9d9" stroke="#222" stroke-width="2"/>
+                <text x="240" y="270" font-size="55" text-anchor="middle" dominant-baseline="middle">🍓</text>
+                <text x="282" y="270" text-anchor="end" dominant-baseline="middle" font-size="44" font-weight="900">J</text>
+              </g>
+              <g>
+                <circle cx="450" cy="250" r="48" fill="#d9d9d9" stroke="#222" stroke-width="2"/>
+                <text x="450" y="250" font-size="55" text-anchor="middle" dominant-baseline="middle">🍉</text>
+                <text x="492" y="250" text-anchor="end" dominant-baseline="middle" font-size="44" font-weight="900">M</text>
+              </g>
+              <g>
+                <circle cx="750" cy="250" r="48" fill="#d9d9d9" stroke="#222" stroke-width="2"/>
+                <text x="750" y="250" font-size="55" text-anchor="middle" dominant-baseline="middle">🍅</text>
+                <text x="792" y="250" text-anchor="end" dominant-baseline="middle" font-size="44" font-weight="900">R</text>
+              </g>
+              <g>
+                <circle cx="960" cy="270" r="48" fill="#d9d9d9" stroke="#222" stroke-width="2"/>
+                <text x="960" y="270" font-size="55" text-anchor="middle" dominant-baseline="middle">🥒</text>
+                <text x="1002" y="270" text-anchor="end" dominant-baseline="middle" font-size="44" font-weight="900">O</text>
+              </g>
+              <g>
+                <circle cx="335" cy="470" r="48" fill="#d9d9d9" stroke="#222" stroke-width="2"/>
+                <text x="335" y="470" font-size="55" text-anchor="middle" dominant-baseline="middle">🍆</text>
+                <text x="377" y="470" text-anchor="end" dominant-baseline="middle" font-size="44" font-weight="900">L</text>
+              </g>
+              <g>
+                <circle cx="600" cy="410" r="48" fill="#d9d9d9" stroke="#222" stroke-width="2"/>
+                <text x="600" y="410" font-size="55" text-anchor="middle" dominant-baseline="middle" transform="rotate(30 600 410)">🍒</text>
+                <text x="642" y="410" text-anchor="end" dominant-baseline="middle" font-size="44" font-weight="900">T</text>
+              </g>
+              <g>
+                <circle cx="865" cy="470" r="48" fill="#d9d9d9" stroke="#222" stroke-width="2"/>
+                <text x="865" y="470" font-size="55" text-anchor="middle" dominant-baseline="middle">🍋</text>
+                <text x="907" y="470" text-anchor="end" dominant-baseline="middle" font-size="44" font-weight="900">C</text>
+              </g>
+              <g>
+                <circle cx="500" cy="585" r="48" fill="#d9d9d9" stroke="#222" stroke-width="2"/>
+                <text x="500" y="585" font-size="55" text-anchor="middle" dominant-baseline="middle">🌽</text>
+                <text x="542" y="585" text-anchor="end" dominant-baseline="middle" font-size="44" font-weight="900">K</text>
+              </g>
+              <g>
+                <circle cx="700" cy="585" r="48" fill="#d9d9d9" stroke="#222" stroke-width="2"/>
+                <text x="700" y="585" font-size="55" text-anchor="middle" dominant-baseline="middle">🥑</text>
+                <text x="742" y="585" text-anchor="end" dominant-baseline="middle" font-size="44" font-weight="900">A</text>
+              </g>
+            </g>
+          </svg>
+        </div>
+        <div class="label">Maatilan kartta</div>
+        <button id="open-park" class="open-btn open-park" type="button">Avaa</button>
+      </div>
+    </div>
+  </div>
+
+  <button id="download-local-data" class="local-export-btn" type="button" tabindex="-1" aria-hidden="true" title="Stáhnout lokální data (Ctrl+Shift+E nebo podržení pravého horního rohu)">Stáhnout lokální data</button>
+  <div id="local-export-hold-hint" class="local-export-hold-hint" aria-hidden="true">Pusťte prst, data se stáhnou.</div>
+  <div id="local-export-notice" role="status" aria-live="polite"></div>
+  <div id="intro-overlay"></div>
+  <div id="ghost-ui">
+    <div id="ghost-character">
+      <div style="font-size: 100px; line-height: 1;">👻</div>
+      <div style="font-weight: bold; background: #d8efff; padding: 2px 8px; border-radius: 10px;"></div>
+    </div>
+    <div id="ghost-bubble">
+      <div id="ghost-text" class="ghost-text"></div>
+      <div id="ghost-buttons"></div>
+      <div style="position: absolute; bottom: -15px; left: 30px; width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 15px solid #007bff;"></div>
+      <div style="position: absolute; bottom: -10px; left: 30px; width: 0; height: 0; border-left: 15px solid transparent; border-right: 15px solid transparent; border-top: 15px solid #fff;"></div>
+    </div>
+  </div>
+
+  <script src="digitool-idle-prompt.js"></script>
+  <script src="digitool-action-log-store.js"></script>
+  <script>
+    const SESSION_KEY = 'digitool_active_session';
+    const RESULTS_KEY = 'digitool_results';
+    const ARCHIVE_KEY = 'digitool_archive';
+    // FI verze: odesílání a ukládání loglistu přes Google Apps Script je vypnuté.
+    // Obnovení: smaž prázdný řetězec a odkomentuj původní URL na dalším řádku.
+    const GOOGLE_DRIVE_UPLOAD_URL = '';
+    // const GOOGLE_DRIVE_UPLOAD_URL = 'https://script.google.com/macros/s/AKfycbyANMdl655_EgkUClCXONgoYJszYTA9t3k3Ed-JYhLoUYvfM_95sQasW_Er1oJKQCI/exec';
+
+    const introOverlay = document.getElementById('intro-overlay');
+    const ghostUI = document.getElementById('ghost-ui');
+    const ghostCharacter = document.getElementById('ghost-character');
+    const ghostBubble = document.getElementById('ghost-bubble');
+    const ghostText = document.getElementById('ghost-text');
+    const ghostButtons = document.getElementById('ghost-buttons');
+    const respondentIdLabel = document.getElementById('respondent-id');
+
+    const readJSON = (key, fallback) => {
+      try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
+      catch (e) { return fallback; }
+    };
+    const writeJSON = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+
+    const readStoredValue = (key) => {
+      let raw = null;
+      try { raw = localStorage.getItem(key); }
+      catch (e) { return { _error: String(e && e.message ? e.message : e) }; }
+      if (raw == null) return null;
+      try { return JSON.parse(raw); }
+      catch (e) { return { _parse_error: String(e && e.message ? e.message : e), _raw: raw }; }
+    };
+
+    const showLocalExportNotice = (message) => {
+      const notice = document.getElementById('local-export-notice');
+      if (!notice) return;
+      notice.textContent = message;
+      notice.classList.add('visible');
+      clearTimeout(showLocalExportNotice._timer);
+      showLocalExportNotice._timer = setTimeout(() => notice.classList.remove('visible'), 4500);
+    };
+
+    const downloadLocalData = () => {
+      if (window.DigitoolActionLogStore && typeof DigitoolActionLogStore.downloadLoglist === 'function') {
+        DigitoolActionLogStore.downloadLoglist();
+      }
+    };
+
+    const uploadJsonToGoogleDrive = async (filename, jsonString) => {
+      // FI verze: odeslání je vypnuté. Obnovení: smaž return false a odkomentuj blok níže
+      // a zároveň obnov GOOGLE_DRIVE_UPLOAD_URL výše.
+      return false;
+      /*
+      if (!GOOGLE_DRIVE_UPLOAD_URL) return false;
+      const body = 'payload=' + encodeURIComponent(JSON.stringify({ filename, content: jsonString }));
+      try {
+        const res = await fetch(GOOGLE_DRIVE_UPLOAD_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8' },
+          body
+        });
+        const text = await res.text();
+        if (text.indexOf('"ok":false') !== -1 || text.indexOf('"ok": false') !== -1) return false;
+        if (text.indexOf('"ok":true') !== -1 || text.indexOf('"ok": true') !== -1 || res.ok) return true;
+      } catch (err) {
+        console.warn('DigiTool upload fetch:', err);
+      }
+      return false;
+      */
+    };
+
+    const todayToken = () => {
+      const d = new Date();
+      const yy = String(d.getFullYear()).slice(-2);
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yy}${mm}${dd}`;
+    };
+
+    const DEVICE_CODE_KEY = 'digitool_device_code';
+    const DEVICE_CODE_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
+
+    const getDeviceCode = () => {
+      const stored = localStorage.getItem(DEVICE_CODE_KEY) || '';
+      if (new RegExp(`^[${DEVICE_CODE_ALPHABET}]{4}$`).test(stored)) return stored;
+      let code = '';
+      for (let i = 0; i < 4; i++) {
+        code += DEVICE_CODE_ALPHABET.charAt(Math.floor(Math.random() * DEVICE_CODE_ALPHABET.length));
+      }
+      localStorage.setItem(DEVICE_CODE_KEY, code);
+      return code;
+    };
+
+    const createRespondentId = () => {
+      const token = todayToken();
+      const counterKey = `digitool_daily_counter_${token}`;
+      const last = parseInt(localStorage.getItem(counterKey) || '0', 10);
+      const next = last + 1;
+      localStorage.setItem(counterKey, String(next));
+      return `${token}_${getDeviceCode()}_${String(next).padStart(2, '0')}`;
+    };
+
+    const sanitizeLogEntry = (entry) =>
+      window.DigitoolActionLogStore && typeof DigitoolActionLogStore.sanitizeEntry === 'function'
+        ? DigitoolActionLogStore.sanitizeEntry(entry)
+        : entry;
+
+    const sanitizeLogList = (logs) =>
+      (Array.isArray(logs) ? logs : []).map((entry) => sanitizeLogEntry(entry));
+
+    const addSessionLog = (action, detail = {}) => {
+      session.logs.push(sanitizeLogEntry({ time: Date.now(), action, ...detail }));
+      writeJSON(SESSION_KEY, session);
+    };
+    const showThanksScreen = (uploadOk = true) => {
+      disposeDigitoolIdleTimer();
+      const mainWrap = document.getElementById('main-wrap');
+      const detail = !GOOGLE_DRIVE_UPLOAD_URL
+        ? 'Kiitos kaikkien kolmen tehtävän tekemisestä.<br>Lataa tiedot painikkeella oikeassa yläkulmassa.'
+        : uploadOk
+          ? 'Kiitos kaikkien kolmen tehtävän tekemisestä.<br>Tiedot tallennettiin.'
+          : 'Kiitos kaikkien kolmen tehtävän tekemisestä.<br>Lataus Google Driveen epäonnistui – pyydä opettajaa tarkistamaan asetukset.';
+      mainWrap.innerHTML = `
+        <div class="thanks-screen">
+          <h2>Kiitos!</h2>
+          <p>${detail}</p>
+        </div>
+      `;
+      introOverlay.style.display = 'none';
+      hideBubble();
+      ghostUI.style.display = 'none';
+    };
+
+
+    const setGhostCentered = () => {
+      ghostUI.style.left = '50%';
+      ghostUI.style.top = '50%';
+      ghostUI.style.bottom = 'auto';
+      ghostUI.style.transform = 'translate(-50%, -50%) scale(1)';
+    };
+    const setGhostMinimized = () => {
+      ghostUI.style.left = '20px';
+      ghostUI.style.top = '20px';
+      ghostUI.style.bottom = 'auto';
+      ghostUI.style.transform = 'scale(0.6)';
+    };
+    const showBubble = () => ghostBubble.classList.add('visible');
+    const hideBubble = () => ghostBubble.classList.remove('visible');
+
+    const renderGhostButtons = (items) => {
+      ghostButtons.innerHTML = '';
+      items.forEach((item) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ghost-btn';
+        btn.textContent = item.label;
+        btn.addEventListener('click', item.onClick);
+        ghostButtons.appendChild(btn);
+      });
+    };
+
+    const appendIntroBackButton = (fromStep, toStep) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ghost-btn ghost-btn--back';
+      btn.textContent = 'Askel taaksepäin';
+      btn.addEventListener('click', () => {
+        addSessionLog('intro_back_clicked', { from_step: fromStep, to_step: toStep });
+        if (fromStep === 3) session.demographics.gender = null;
+        renderIntroStep(toStep);
+      });
+      ghostButtons.appendChild(btn);
+    };
+
+    const renderIntroStep = (step) => {
+      session.intro_step = step;
+      writeJSON(SESSION_KEY, session);
+      showBubble();
+      if (step === 1) {
+        ghostText.textContent = 'Hei! Opastan sinua tänään tehtävissä. Ennen kuin aloitamme, tarvitsen suostumuksesi. Tehtäväsi on auttaa meitä selvittämään, miten oppilaat ratkaisevat ongelmia. Tämä ei ole koe, eikä sillä ole mitään vaikutusta koulunumeroihisi. Jos et halua enää jatkaa, voit lopettaa milloin tahansa. Suostutko osallistumaan?';
+        renderGhostButtons([{
+          label: 'Kyllä, suostun.',
+          onClick: () => {
+            session.demographics.research_consent = true;
+            addSessionLog('research_consent_given', {
+              question: 'research_participation_consent',
+              value: true
+            });
+            renderIntroStep(2);
+          }
+        }]);
+      } else if (step === 2) {
+        ghostText.textContent = 'Millä luokalla olet?';
+        renderGhostButtons(
+          [2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({
+            label: `${n}. lk`,
+            onClick: () => {
+              session.demographics.class = String(n);
+              addSessionLog('demography_class_selected', {
+                question: 'school_grade',
+                value: String(n)
+              });
+              renderIntroStep(3);
+            },
+          }))
+        );
+        appendIntroBackButton(2, 1);
+      } else {
+        ghostText.textContent = 'Oletko tyttö vai poika?';
+        renderGhostButtons([
+          { label: 'Tyttö', onClick: () => { session.demographics.gender = 'girl'; finishIntro(); } },
+          { label: 'Poika', onClick: () => { session.demographics.gender = 'boy'; finishIntro(); } }
+        ]);
+        appendIntroBackButton(3, 2);
+      }
+      writeJSON(SESSION_KEY, session);
+    };
+
+    const showTaskChooserGhost = () => {
+      const { eDone, dDone, pDone } = getProgress();
+      const doneCount = [eDone, dDone, pDone].filter(Boolean).length;
+      if (eDone && dDone && pDone) {
+        ghostText.textContent = 'Odota, että tiedot lähetetään palvelimelle.';
+      } else if (doneCount >= 1 && doneCount < 3) {
+        ghostText.textContent = 'Hienoa, tehtävä on ratkaistu! Avaa seuraava tehtävä.';
+      } else {
+        ghostText.textContent = 'Valitse tehtävä, josta aloitat.';
+      }
+      renderGhostButtons([]);
+      showBubble();
+      ghostUI.style.transform = 'scale(1)';
+      addSessionLog('ghost_task_choice_opened');
+    };
+
+    const finishIntro = () => {
+      session.intro_done = true;
+      addSessionLog('demography_gender_selected', {
+        question: 'gender',
+        value: session.demographics.gender
+      });
+      addSessionLog('intro_completed', { demographics: session.demographics });
+      writeJSON(SESSION_KEY, session);
+      introOverlay.style.display = 'none';
+      document.body.style.overflow = '';
+      setGhostMinimized();
+      hideBubble();
+      setupHubIdleIfAllowed();
+    };
+
+    const setupHubIdleIfAllowed = () => {
+      disposeDigitoolIdleTimer();
+      if (!session.intro_done || session.downloaded) return;
+      const { eDone, dDone, pDone } = getProgress();
+      if (eDone && dDone && pDone) return;
+      setupDigitoolIdleGhostPrompt({
+        logAction: (action, detail = {}) => addSessionLog(action, detail),
+        isIdleAllowed: () => {
+          if (!session.intro_done || session.downloaded) return false;
+          if (!document.getElementById('main-title')) return false;
+          const progress = getProgress();
+          return !(progress.eDone && progress.dDone && progress.pDone);
+        },
+        ghostText,
+        ghostButtons,
+        ghostBubble,
+        ghostUI,
+        defaultGhostHtml: '',
+        defaultGhostButtonsHtml: '',
+        onRequestHelp: () => showTaskChooserGhost()
+      });
+    };
+
+    const resultsMatchSession = (results) =>
+      results.respondent_id === session.respondent_id ||
+      results.euler?.respondent_id === session.respondent_id ||
+      results.degree?.respondent_id === session.respondent_id ||
+      results.park?.respondent_id === session.respondent_id;
+
+    const getProgress = () => {
+      const results = readJSON(RESULTS_KEY, {});
+      const eDone = results.euler && results.euler.respondent_id === session.respondent_id;
+      const dDone = results.degree && results.degree.respondent_id === session.respondent_id;
+      const pDone = results.park && results.park.respondent_id === session.respondent_id;
+      return { eDone, dDone, pDone, results };
+    };
+
+    const stripNestedRespondentId = (taskResult) => {
+      if (!taskResult || typeof taskResult !== 'object') return taskResult;
+      const out = { ...taskResult };
+      delete out.respondent_id;
+      if (Array.isArray(out.action_logs)) out.action_logs = sanitizeLogList(out.action_logs);
+      if (Array.isArray(out.trials)) {
+        out.trials = out.trials.map((trial) => {
+          if (!trial || typeof trial !== 'object' || !Array.isArray(trial.action_logs)) return trial;
+          return { ...trial, action_logs: sanitizeLogList(trial.action_logs) };
+        });
+      }
+      return out;
+    };
+
+    const collectTaskActionLogs = (taskResult) => {
+      if (!taskResult || typeof taskResult !== 'object') return [];
+      if (Array.isArray(taskResult.action_logs) && taskResult.action_logs.length > 0) {
+        return taskResult.action_logs;
+      }
+      const trials = Array.isArray(taskResult.trials) ? taskResult.trials : [];
+      return trials.flatMap((trial) =>
+        Array.isArray(trial?.action_logs) ? trial.action_logs : []
+      );
+    };
+
+    const buildAllActionLogs = (results) => {
+      const blocks = [
+        { block: 'euler', logs: collectTaskActionLogs(results.euler) },
+        { block: 'degree_sequence', logs: collectTaskActionLogs(results.degree) },
+        { block: 'park', logs: collectTaskActionLogs(results.park) }
+      ];
+      const merged = [];
+      blocks.forEach(({ block, logs }) => {
+        logs.forEach((entry) => {
+          merged.push(sanitizeLogEntry({
+            ...entry,
+            task_block: entry.task_block || block
+          }));
+        });
+      });
+      merged.sort((a, b) => (a.time || 0) - (b.time || 0));
+      return merged;
+    };
+
+    const readSessionActionLogs = (respondentId, scope) => {
+      if (window.DigitoolActionLogStore && typeof DigitoolActionLogStore.read === 'function') {
+        return DigitoolActionLogStore.read(respondentId, scope);
+      }
+      try {
+        const raw = sessionStorage.getItem(
+          `digitool_action_logs_${respondentId || 'anon'}_${scope}`
+        );
+        const parsed = raw ? JSON.parse(raw) : [];
+        return sanitizeLogList(Array.isArray(parsed) ? parsed : []);
+      } catch (e) {
+        return [];
+      }
+    };
+
+    const applyTaskAvailability = () => {
+      const mainTitle = document.getElementById('main-title');
+      const eulerBtn = document.getElementById('open-euler');
+      const degreeBtn = document.getElementById('open-degree');
+      const parkBtn = document.getElementById('open-park');
+      if (!mainTitle || !eulerBtn || !degreeBtn || !parkBtn) return;
+      const eulerCard = eulerBtn.closest('.card');
+      const degreeCard = degreeBtn.closest('.card');
+      const parkCard = parkBtn.closest('.card');
+      const { eDone, dDone, pDone } = getProgress();
+
+      eulerBtn.disabled = false;
+      degreeBtn.disabled = false;
+      parkBtn.disabled = false;
+      eulerCard.classList.remove('locked');
+      degreeCard.classList.remove('locked');
+      parkCard.classList.remove('locked');
+
+      if (eDone && dDone && pDone) {
+        mainTitle.textContent = 'Odota, että tiedot lähetetään palvelimelle.';
+        eulerBtn.disabled = true;
+        degreeBtn.disabled = true;
+        parkBtn.disabled = true;
+        eulerCard.classList.add('locked');
+        degreeCard.classList.add('locked');
+        parkCard.classList.add('locked');
+        return;
+      }
+
+      const doneCount = [eDone, dDone, pDone].filter(Boolean).length;
+      if (doneCount >= 1) {
+        mainTitle.textContent = 'Jatka seuraavaan tehtävään.';
+      } else {
+        mainTitle.textContent = 'Valitse, mistä tehtävästä aloitat.';
+      }
+
+      if (eDone) {
+        eulerBtn.disabled = true;
+        eulerCard.classList.add('locked');
+      }
+      if (dDone) {
+        degreeBtn.disabled = true;
+        degreeCard.classList.add('locked');
+      }
+      if (pDone) {
+        parkBtn.disabled = true;
+        parkCard.classList.add('locked');
+      }
+    };
+
+    const uploadSessionSnapshot = async () => {
+      const { eDone, dDone, pDone, results } = getProgress();
+      const doneCount = [eDone, dDone, pDone].filter(Boolean).length;
+      if (session.downloaded) {
+        if (doneCount === 3) showThanksScreen(true);
+        return;
+      }
+      if (doneCount === 0) return;
+      const alreadySent = (session.uploaded_task_count || 0) >= doneCount && !session.upload_failed;
+      if (alreadySent || uploadSessionSnapshot._busy) return;
+      uploadSessionSnapshot._busy = true;
+      try {
+        const completedTasks = [];
+        if (eDone) completedTasks.push('euler');
+        if (dDone) completedTasks.push('degree');
+        if (pDone) completedTasks.push('park');
+        const allActionLogs = buildAllActionLogs(results);
+        const combined = {
+          respondent_id: session.respondent_id,
+          started_at: session.started_at,
+          first_task: session.first_task || null,
+          demographics: session.demographics,
+          hub_logs: sanitizeLogList(session.logs),
+          all_action_logs: allActionLogs,
+          loglist: allActionLogs,
+          euler: eDone ? stripNestedRespondentId(results.euler) : null,
+          degree_sequence: dDone ? stripNestedRespondentId(results.degree) : null,
+          park: pDone ? stripNestedRespondentId(results.park) : null,
+          completed_tasks: completedTasks,
+          tasks_completed_count: doneCount,
+          last_completed_task: session.last_completed_task || null,
+          all_tasks_completed: doneCount === 3,
+          exported_at: new Date().toISOString()
+        };
+        const filename = `DigiTool_FI_${session.respondent_id}.json`;
+        const jsonString = JSON.stringify(combined, null, 2);
+        let uploadOk = false;
+        if (GOOGLE_DRIVE_UPLOAD_URL) {
+          uploadOk = await uploadJsonToGoogleDrive(filename, jsonString);
+          addSessionLog(uploadOk ? 'combined_upload_ok' : 'combined_upload_failed', {
+            filename,
+            tasks_completed_count: doneCount,
+            last_completed_task: session.last_completed_task || null
+          });
+        } else {
+          console.warn('GOOGLE_DRIVE_UPLOAD_URL není nastavená – data jen v prohlížeči.');
+          addSessionLog('combined_upload_skipped_no_url', { tasks_completed_count: doneCount });
+        }
+        const archive = readJSON(ARCHIVE_KEY, []);
+        const list = Array.isArray(archive) ? archive : [];
+        const existingIndex = list.findIndex((item) => item && item.respondent_id === session.respondent_id);
+        if (existingIndex >= 0) list[existingIndex] = combined;
+        else list.push(combined);
+        writeJSON(ARCHIVE_KEY, list);
+        if (!GOOGLE_DRIVE_UPLOAD_URL || uploadOk) {
+          session.uploaded_task_count = doneCount;
+          session.upload_failed = false;
+        } else {
+          session.upload_failed = true;
+        }
+        if (doneCount === 3) session.downloaded = true;
+        writeJSON(SESSION_KEY, session);
+        if (doneCount === 3) showThanksScreen(!GOOGLE_DRIVE_UPLOAD_URL || uploadOk);
+      } finally {
+        uploadSessionSnapshot._busy = false;
+      }
+    };
+
+    const openTask = (fileName, taskKey) => {
+      if (!session.intro_done) {
+        addSessionLog('task_open_blocked_before_intro', { task: taskKey });
+        return;
+      }
+      const { eDone, dDone, pDone } = getProgress();
+      if (
+        (taskKey === 'euler' && eDone) ||
+        (taskKey === 'degree' && dDone) ||
+        (taskKey === 'park' && pDone)
+      ) {
+        addSessionLog('task_open_blocked_already_completed', { task: taskKey });
+        return;
+      }
+      if (!session.first_task) {
+        session.first_task = taskKey;
+        addSessionLog('first_task_selected', { task: taskKey });
+      }
+      addSessionLog('task_open_requested', { task: taskKey, file: fileName });
+      const baseUrl = new URL('.', window.location.href);
+      const taskUrl = new URL(fileName, baseUrl);
+      taskUrl.searchParams.set('rid', session.respondent_id);
+      window.location.href = taskUrl.toString();
+    };
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const completed = urlParams.get('completed');
+    const isReturningFromTask = completed === 'euler' || completed === 'degree' || completed === 'park';
+
+    const makeNewSession = () => ({
+      respondent_id: createRespondentId(),
+      started_at: new Date().toISOString(),
+      intro_step: 1,
+      intro_done: false,
+      downloaded: false,
+      uploaded_task_count: 0,
+      upload_failed: false,
+      last_completed_task: null,
+      first_task: null,
+      demographics: { class: null, gender: null, research_consent: null },
+      logs: []
+    });
+
+    let session = readJSON(SESSION_KEY, null);
+    const currentResults = readJSON(RESULTS_KEY, {});
+    const hasEulerForSession = !!(session && currentResults.euler && currentResults.euler.respondent_id === session.respondent_id);
+    const hasDegreeForSession = !!(session && currentResults.degree && currentResults.degree.respondent_id === session.respondent_id);
+    const hasParkForSession = !!(session && currentResults.park && currentResults.park.respondent_id === session.respondent_id);
+    const completedTaskCount = [hasEulerForSession, hasDegreeForSession, hasParkForSession].filter(Boolean).length;
+    const inProgressSession = completedTaskCount > 0 && completedTaskCount < 3;
+
+    if (!session || session.downloaded || (!isReturningFromTask && !inProgressSession)) {
+      session = makeNewSession();
+      writeJSON(SESSION_KEY, session);
+      writeJSON(RESULTS_KEY, {});
+    }
+    respondentIdLabel.textContent = '';
+
+    if (completed === 'euler' || completed === 'degree' || completed === 'park') {
+      // Fallback: pokud se vrátíme z úlohy a výsledky nejsou správně navázané na session,
+      // nastavíme minimální "completed" záznam, aby se zobrazila pokračovací stránka.
+      const resultsSnapshot = readJSON(RESULTS_KEY, {});
+      if (completed === 'euler') {
+        const hasValidEuler = !!(resultsSnapshot.euler && resultsSnapshot.euler.respondent_id === session.respondent_id);
+        if (!hasValidEuler) {
+          const recovered = readSessionActionLogs(session.respondent_id, 'euler');
+          resultsSnapshot.euler = {
+            respondent_id: session.respondent_id,
+            completed_at: new Date().toISOString(),
+            action_logs: recovered.length ? recovered : resultsSnapshot.euler?.action_logs || [],
+            trials: resultsSnapshot.euler?.trials || []
+          };
+          writeJSON(RESULTS_KEY, resultsSnapshot);
+        }
+      } else if (completed === 'degree') {
+        const hasValidDegree = !!(resultsSnapshot.degree && resultsSnapshot.degree.respondent_id === session.respondent_id);
+        if (!hasValidDegree) {
+          const recovered = readSessionActionLogs(session.respondent_id, 'degree');
+          resultsSnapshot.degree = {
+            respondent_id: session.respondent_id,
+            completed_at: new Date().toISOString(),
+            action_logs: recovered.length ? recovered : resultsSnapshot.degree?.action_logs || [],
+            trials: resultsSnapshot.degree?.trials || []
+          };
+          writeJSON(RESULTS_KEY, resultsSnapshot);
+        }
+      } else if (completed === 'park') {
+        const hasValidPark = !!(resultsSnapshot.park && resultsSnapshot.park.respondent_id === session.respondent_id);
+        if (!hasValidPark) {
+          const recovered = readSessionActionLogs(session.respondent_id, 'park');
+          resultsSnapshot.park = {
+            respondent_id: session.respondent_id,
+            completed_at: new Date().toISOString(),
+            action_logs: recovered.length ? recovered : resultsSnapshot.park?.action_logs || [],
+            trials: resultsSnapshot.park?.trials || []
+          };
+          writeJSON(RESULTS_KEY, resultsSnapshot);
+        }
+      }
+    }
+
+    if (completed === 'euler' || completed === 'degree' || completed === 'park') {
+      session.last_completed_task = completed;
+      addSessionLog('task_returned_to_hub', { task: completed });
+      history.replaceState({}, '', 'index.html');
+    }
+
+    document.getElementById('download-local-data').addEventListener('click', downloadLocalData);
+    const localExportHoldHint = document.getElementById('local-export-hold-hint');
+    const localExportHoldRoot = document.getElementById('main-wrap');
+    const LOCAL_EXPORT_HOLD_MS = 1500;
+    let localExportHoldTimer = 0;
+    let localExportHoldReady = false;
+    let localExportHoldPointer = null;
+    const isLocalExportHoldTarget = (node) => !!(node && node.closest && node.closest('#main-title, .thanks-screen h2'));
+    const resetLocalExportHold = () => {
+      clearTimeout(localExportHoldTimer);
+      localExportHoldTimer = 0;
+      localExportHoldReady = false;
+      localExportHoldPointer = null;
+      localExportHoldHint.classList.remove('visible');
+    };
+    localExportHoldRoot.addEventListener('pointerdown', (e) => {
+      if (localExportHoldPointer != null) return;
+      if (!isLocalExportHoldTarget(e.target)) return;
+      if (e.button != null && e.button !== 0) return;
+      e.preventDefault();
+      localExportHoldPointer = e.pointerId;
+      localExportHoldReady = false;
+      try { localExportHoldRoot.setPointerCapture(e.pointerId); } catch (err) {}
+      clearTimeout(localExportHoldTimer);
+      localExportHoldTimer = setTimeout(() => {
+        localExportHoldReady = true;
+        localExportHoldHint.classList.add('visible');
+        if (navigator.vibrate) navigator.vibrate(30);
+      }, LOCAL_EXPORT_HOLD_MS);
+    });
+    localExportHoldRoot.addEventListener('pointerup', (e) => {
+      if (e.pointerId !== localExportHoldPointer) return;
+      const shouldDownload = localExportHoldReady;
+      resetLocalExportHold();
+      if (shouldDownload) document.getElementById('download-local-data').click();
+    });
+    localExportHoldRoot.addEventListener('pointercancel', (e) => {
+      if (e.pointerId !== localExportHoldPointer) return;
+      resetLocalExportHold();
+    });
+    localExportHoldRoot.addEventListener('contextmenu', (e) => {
+      if (isLocalExportHoldTarget(e.target)) e.preventDefault();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.repeat || e.isComposing) return;
+      if (e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && (e.key === 'E' || e.key === 'e')) {
+        const target = e.target;
+        const typing = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+        if (typing) return;
+        e.preventDefault();
+        document.getElementById('download-local-data').click();
+      }
+    });
+
+    document.getElementById('open-euler').addEventListener('click', () => openTask('19_EulerTask_plus3.html', 'euler'));
+    document.getElementById('open-degree').addEventListener('click', () => openTask('14_DegreeSequenceTask.html', 'degree'));
+    document.getElementById('open-park').addEventListener('click', () => openTask('3_ParkTask.html', 'park'));
+
+    ghostCharacter.addEventListener('click', () => {
+      if (!session.intro_done) return;
+      showTaskChooserGhost();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!session.intro_done) return;
+      if (!ghostUI.contains(e.target)) {
+        hideBubble();
+        setGhostMinimized();
+      }
+    });
+
+    if (!session.intro_done) {
+      introOverlay.style.display = 'block';
+      document.body.style.overflow = 'hidden';
+      setGhostCentered();
+      showBubble();
+      renderIntroStep(session.intro_step || 1);
+      addSessionLog('intro_overlay_shown');
+    } else {
+      document.body.style.overflow = '';
+      introOverlay.style.display = 'none';
+      setGhostMinimized();
+      hideBubble();
+    }
+
+    uploadSessionSnapshot();
+    applyTaskAvailability();
+    if (session.intro_done) setupHubIdleIfAllowed();
+  </script>
+  <script>
+    (function () {
+      const HUB_VERSION = 'v18-fi-local-log';
+      const prev = localStorage.getItem('digitool_hub_version');
+      if (prev !== HUB_VERSION && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((regs) => {
+          regs.forEach((r) => r.unregister());
+        });
+        if (typeof caches !== 'undefined') {
+          caches.keys().then((keys) => {
+            keys.filter((k) => k.indexOf('digitool') !== -1).forEach((k) => caches.delete(k));
+          });
+        }
+        localStorage.setItem('digitool_hub_version', HUB_VERSION);
+      }
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => {});
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

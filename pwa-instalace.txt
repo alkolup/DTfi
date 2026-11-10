@@ -1,0 +1,86 @@
+DigiTool pro Tablet – PWA na Androidu (Chrome)
+=============================================
+
+Cíl: aplikace se po instalaci otevírá sama o sobě (bez adresního řádku),
+stejně jako klasická aplikace — přes vestavěný Chrome (WebView).
+
+
+1) Nahrajte na tablet celou složku „DigiTool pro Tablet“ včetně vendor/
+
+
+2) Otevřete DigiTool v Chromu přes HTTP (ne jako soubor z disku).
+
+   Chrome na Androidu instaluje PWA jen z „bezpečného“ přístupu:
+
+   • https://…  NEBO
+   • http://localhost…  /  http://127.0.0.1…  (lokální server přímo na tabletu)
+
+   Poznámka: čistý přístup po síti na adresu počítače typu http://192.168.…
+   nemusí povolit service worker ani nabídku instalace — nejspolehlivější
+   je aplikace „HTTP server“ / „Web server“ z obchodu Play, která na tabletu
+   sama obslouží složku a nabídne adresu localhost nebo 127.0.0.1.
+
+
+3) Instalace jako aplikace
+
+   V Chrome otevřete rozcestník (index.html), počkejte na načtení.
+
+   Pak nabídka instalace záleží na verzi Chromu:
+
+   • položka v menu ⋮ („Nainstalovat aplikaci“, „Instalovat aplikaci“),
+     nebo
+   • přidání zástupce: menu ⋮ → „Přidat na plochu“ / „Install app“.
+
+   Po instalaci najdete DigiTool mezi aplikacemi pod názvem „DigiTool“ —
+   při startu poběží v režimu standalone (bez lišty prohlížeče).
+
+   Nutné soubory pro instalaci v Chromu: v kořeni složky musí být také
+   icon-192.png a icon-512.png (Chrome je často vyžaduje; bez nich položka
+   „Nainstalovat aplikaci“ nemusí vůbec přijít). Případně je znovu vygenerujte
+   na PC: PowerShell → scripts\gen-pwa-icons.ps1
+
+
+Když Chrome instalaci stále neukáže
+------------------------------------
+• Otevírejte stránku jako http://127.0.0.1:… nebo https://…  
+  Adresa http://192.168.… často NENÍ „bezpečný kontext“ → service worker se
+  neregistruje a instalace PWA nejde.
+
+• Na tabletu použijte aplikaci „HTTP server“ z Play a vyberte složku
+  DigiTool — obvykle dostanete přesně http://127.0.0.1:8080/ apod.
+
+• Obnovte stránku (případně Chrome → Nastavení stránky → Data stránek vymazat
+  jen pro tuto adresu), ať se načte nový manifest a service worker.
+
+• Zkuste menu ⋮ → „Přidat na plochu“ / „Add to Home screen“ — někdy se tak
+  přidá zástupce i bez hlášky „Instalovat aplikaci“.
+
+
+4) Offline cache
+
+   Po jednom dokončeném načtení přes HTTP (včetně projítí rozcestníku a obou
+   úloh alespoň jednou, pokud chcete mít vše v cache) může aplikace fungovat
+   i bez sítě, dokud Chrome nemazal data stránky.
+
+
+────────────────────────────────────────────────────────────────────────
+
+Manuální server na počítači (Windows)
+
+  py -m http.server 8080
+
+  python -m http.server 8080
+
+Pak v Chromu na tabletu (stejná Wi‑Fi): http://IP_počítače:8080/
+
+(Pokud se neobjeví instalace PWA, použijte spíše bod 2 – server na tabletu.)
+ 
+Knihovny jsPsych jsou lokálně ve složce vendor/ — samotné úlohy nevyžadují
+internet k načtení skriptů.
+
+
+Instalační soubor „bokem“ (APK pro Android)
+--------------------------------------------
+Pokud v Chromu stále nevidíte „Nainstalovat aplikaci“, lze aplikaci zabalit do
+APK pomocí Capacitor a Android Studio — podrobný postup je v souboru
+android-apk-navod.txt (složka projektu …\DigiTool\DigiToolTabletAndroid).
